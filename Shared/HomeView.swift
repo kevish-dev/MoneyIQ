@@ -19,6 +19,10 @@ struct HomeView: View {
                     Section {
                         Text("Hi, \(account.firstName)")
                             .font(.headline)
+                        BudgetCardView(currencyCode: account.preferredCurrencyCode)
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                            .padding(.vertical, 6)
                     }
                 }
 

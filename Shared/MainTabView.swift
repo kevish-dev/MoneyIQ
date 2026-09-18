@@ -15,6 +15,9 @@ struct MainTabView: View {
             Tab("Insights", systemImage: "chart.line.uptrend.xyaxis") {
                 InsightsView(authManager: authManager)
             }
+            Tab("Goals", systemImage: "target") {
+                GoalsView(authManager: authManager)
+            }
             Tab("Net Worth", systemImage: "chart.pie.fill") {
                 NetWorthView(authManager: authManager)
             }

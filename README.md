@@ -42,9 +42,10 @@ order — a feature only starts once whatever it needs already exists.
 
 This repo currently implements **Phase 1 (Foundation)**, the free-tier slice
 of **Phase 2 (Apple-Native Essentials)**, **Phase 3 (Screenshot Capture &
-Auto-Processing)**, and the free-tier slice of **Phase 4 (Intelligence &
-Insights)**, deliberately scoped to work without a paid Apple Developer
-Program membership:
+Auto-Processing)**, the free-tier slice of **Phase 4 (Intelligence &
+Insights)**, and the free-tier slice of **Phase 5 (Budgeting Depth)**,
+deliberately scoped to work without a paid Apple Developer Program
+membership:
 
 - **Unified auth across providers.** Sign in with Google and sign in with
   GitHub both work today, via `ASWebAuthenticationSession` + PKCE — no
@@ -101,11 +102,21 @@ Program membership:
 - **Net worth tracker.** A standalone assets/liabilities list (`NetWorthAccount`)
   with a running total — independent of transaction history, as the PRD
   calls for.
-- **Home / Insights / Net Worth / Settings tabs** — Settings moved out of a
-  sheet into a proper tab now that there are multiple top-level sections.
-  The weekly summary notification is also data-driven now: it's rescheduled
-  with your real spend-to-date whenever Settings appears or the schedule
-  changes, since a local notification's content is fixed at schedule time.
+- **Monthly budget cap, with rollover.** This actually got its first real UI
+  in this pass — Phase 1 defined the `Budget` model but never shipped a way
+  to set one. The budget card on Home shows spend vs. cap for the month with
+  a progress bar; toggling rollover carries last month's *unused* amount
+  into this month's effective cap (overspending never carries forward as a
+  debt — only one month back, not a compounding chain).
+- **Goal-based savings.** Set a target amount and date ("Save ₹50,000 for a
+  trip by December"), log contributions, and see progress plus a suggested
+  monthly amount to stay on track.
+- **Home / Insights / Goals / Net Worth / Settings tabs** — Settings moved
+  out of a sheet into a proper tab now that there are multiple top-level
+  sections. The weekly summary notification is also data-driven now: it's
+  rescheduled with your real spend-to-date whenever Settings appears or the
+  schedule changes, since a local notification's content is fixed at
+  schedule time.
 - **Fully offline** — no CloudKit sync yet, everything lives in a local
   SwiftData store (`cloudKitDatabase: .none`).
 
@@ -213,7 +224,6 @@ Per the PRD's dependency table, these stay off until you enroll
 - Push-based financial notifications (need an APNs key/certificate) — the
   on-device daily/weekly reminders above don't need this either
 - Siri Shortcuts / App Intents
-- Rollover budgets, goal-based savings, shared/family budgets (Phase 5) —
-  don't need the paid program individually, but are sequenced for later
-  phases per the PRD's dependency ordering; shared budgets specifically need
-  CloudKit shared zones, which do need it
+- Shared/family budgets (Phase 5) — needs CloudKit shared zones plus a
+  permissions model; rollover and goal-based savings, the rest of Phase 5,
+  are already live above since they don't need CloudKit
