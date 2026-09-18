@@ -1,0 +1,98 @@
+name: MoneyIQ
+options:
+  bundleIdPrefix: com.moneyiq
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+
+configFiles:
+  Debug: Config/Secrets.xcconfig
+  Release: Config/Secrets.xcconfig
+
+packages:
+  MoneyIQCore:
+    path: MoneyIQCore
+
+targets:
+  MoneyIQ-iOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: iOS/MoneyIQ
+        excludes:
+          - Info.plist
+      - path: Shared
+    info:
+      path: iOS/MoneyIQ/Info.plist
+      properties:
+        UILaunchScreen: {}
+        MIQ_GOOGLE_CLIENT_ID: $(MIQ_GOOGLE_CLIENT_ID)
+        MIQ_GOOGLE_REDIRECT_URI: $(MIQ_GOOGLE_REDIRECT_URI)
+        MIQ_GITHUB_CLIENT_ID: $(MIQ_GITHUB_CLIENT_ID)
+        MIQ_GITHUB_REDIRECT_URI: $(MIQ_GITHUB_REDIRECT_URI)
+        CFBundleURLTypes:
+          - CFBundleURLName: com.moneyiq.oauth
+            CFBundleURLSchemes:
+              - moneyiq
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.moneyiq.ios
+        PRODUCT_NAME: MoneyIQ
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+    dependencies:
+      - package: MoneyIQCore
+
+  MoneyIQ-macOS:
+    type: application
+    platform: macOS
+    sources:
+      - path: macOS/MoneyIQ
+        excludes:
+          - Info.plist
+      - path: Shared
+    info:
+      path: macOS/MoneyIQ/Info.plist
+      properties:
+        MIQ_GOOGLE_CLIENT_ID: $(MIQ_GOOGLE_CLIENT_ID)
+        MIQ_GOOGLE_REDIRECT_URI: $(MIQ_GOOGLE_REDIRECT_URI)
+        MIQ_GITHUB_CLIENT_ID: $(MIQ_GITHUB_CLIENT_ID)
+        MIQ_GITHUB_REDIRECT_URI: $(MIQ_GITHUB_REDIRECT_URI)
+        CFBundleURLTypes:
+          - CFBundleURLName: com.moneyiq.oauth
+            CFBundleURLSchemes:
+              - moneyiq
+    entitlements:
+      path: macOS/MoneyIQ/MoneyIQ.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.moneyiq.macos
+        PRODUCT_NAME: MoneyIQ
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        COMBINE_HIDPI_IMAGES: true
+    dependencies:
+      - package: MoneyIQCore
+
+schemes:
+  MoneyIQ-iOS:
+    build:
+      targets:
+        MoneyIQ-iOS: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+  MoneyIQ-macOS:
+    build:
+      targets:
+        MoneyIQ-macOS: all
+    run:
+      config: Debug
+    test:
+      config: Debug
