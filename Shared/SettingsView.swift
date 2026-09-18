@@ -1,0 +1,200 @@
+import SwiftUI
+import MoneyIQCore
+
+struct SettingsView: View {
+    let authManager: AuthManager
+    @Bindable var settings: AppSettingsStore
+    @Bindable var notifications: NotificationScheduler
+    let lockManager: AppLockManager
+
+    @State private var notificationDeniedAlertKind: NotificationToggleKind?
+
+    private enum NotificationToggleKind {
+        case daily
+        case weekly
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                securitySection
+                notificationsSection
+                accountSection
+            }
+            .navigationTitle("Settings")
+            .alert(
+                "Notifications are off",
+                isPresented: Binding(
+                    get: { notificationDeniedAlertKind != nil },
+                    set: { if !$0 { notificationDeniedAlertKind = nil } }
+                )
+            ) {
+                Button("Open Settings") { openSystemNotificationSettings() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Turn on notifications for MoneyIQ in Settings to enable reminders.")
+            }
+        }
+    }
+
+    private var securitySection: some View {
+        Section {
+            let biometry = lockManager.availableBiometry
+            Toggle(isOn: $settings.isAppLockEnabled) {
+                Label("Require \(biometry.displayName)", systemImage: biometry.systemImageName)
+            }
+            .disabled(biometry == .none)
+        } header: {
+            Text("Security")
+        } footer: {
+            if lockManager.availableBiometry == .none {
+                Text("Face ID or Touch ID isn't set up on this device.")
+            } else {
+                Text("Lock MoneyIQ behind \(lockManager.availableBiometry.displayName) whenever you open or return to the app.")
+            }
+        }
+    }
+
+    private var notificationsSection: some View {
+        Section {
+            Toggle("Daily spending reminder", isOn: dailyReminderBinding)
+            if settings.isDailyReminderEnabled {
+                DatePicker(
+                    "Remind me at",
+                    selection: timeBinding(for: \.dailyReminderTime),
+                    displayedComponents: .hourAndMinute
+                )
+            }
+
+            Toggle("Weekly summary", isOn: weeklySummaryBinding)
+            if settings.isWeeklySummaryEnabled {
+                Picker("Day", selection: $settings.weeklySummaryWeekday) {
+                    ForEach(1...7, id: \.self) { weekday in
+                        Text(weekdaySymbol(weekday)).tag(weekday)
+                    }
+                }
+                DatePicker(
+                    "At",
+                    selection: timeBinding(for: \.weeklySummaryTime),
+                    displayedComponents: .hourAndMinute
+                )
+            }
+        } header: {
+            Text("Notifications")
+        } footer: {
+            Text("Reminders are scheduled entirely on this device.")
+        }
+    }
+
+    private var accountSection: some View {
+        Section {
+            if let account = authManager.currentAccount {
+                LabeledContent("Name", value: "\(account.firstName) \(account.lastName)")
+                LabeledContent("Email", value: account.email)
+            }
+            Button("Sign Out", role: .destructive) {
+                authManager.signOut()
+            }
+        } header: {
+            Text("Account")
+        }
+    }
+
+    private var dailyReminderBinding: Binding<Bool> {
+        Binding(
+            get: { settings.isDailyReminderEnabled },
+            set: { newValue in
+                guard newValue else {
+                    settings.isDailyReminderEnabled = false
+                    notifications.cancelDailyReminder()
+                    return
+                }
+                Task {
+                    let granted = await notifications.requestPermissionIfNeeded()
+                    if granted {
+                        settings.isDailyReminderEnabled = true
+                        notifications.scheduleDailyReminder(at: settings.dailyReminderTime)
+                    } else {
+                        settings.isDailyReminderEnabled = false
+                        notificationDeniedAlertKind = .daily
+                    }
+                }
+            }
+        )
+    }
+
+    private var weeklySummaryBinding: Binding<Bool> {
+        Binding(
+            get: { settings.isWeeklySummaryEnabled },
+            set: { newValue in
+                guard newValue else {
+                    settings.isWeeklySummaryEnabled = false
+                    notifications.cancelWeeklySummary()
+                    return
+                }
+                Task {
+                    let granted = await notifications.requestPermissionIfNeeded()
+                    if granted {
+                        settings.isWeeklySummaryEnabled = true
+                        notifications.scheduleWeeklySummary(weekday: settings.weeklySummaryWeekday, time: settings.weeklySummaryTime)
+                    } else {
+                        settings.isWeeklySummaryEnabled = false
+                        notificationDeniedAlertKind = .weekly
+                    }
+                }
+            }
+        )
+    }
+
+    private func timeBinding(for keyPath: ReferenceWritableKeyPath<AppSettingsStore, DateComponents>) -> Binding<Date> {
+        Binding(
+            get: {
+                Calendar.current.date(from: settings[keyPath: keyPath]) ?? .now
+            },
+            set: { newDate in
+                let comps = Calendar.current.dateComponents([.hour, .minute], from: newDate)
+                settings[keyPath: keyPath] = comps
+                if settings.isDailyReminderEnabled {
+                    notifications.scheduleDailyReminder(at: settings.dailyReminderTime)
+                }
+                if settings.isWeeklySummaryEnabled {
+                    notifications.scheduleWeeklySummary(weekday: settings.weeklySummaryWeekday, time: settings.weeklySummaryTime)
+                }
+            }
+        )
+    }
+
+    private func weekdaySymbol(_ weekday: Int) -> String {
+        let symbols = Calendar.current.weekdaySymbols
+        return symbols[(weekday - 1) % 7]
+    }
+
+    private func openSystemNotificationSettings() {
+        #if os(iOS)
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
+        #elseif os(macOS)
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+            NSWorkspace.shared.open(url)
+        }
+        #endif
+    }
+}
+
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
+
+#Preview {
+    let container = PersistenceController.makeContainer(inMemory: true)
+    let settings = AppSettingsStore()
+    SettingsView(
+        authManager: AuthManager(modelContext: container.mainContext),
+        settings: settings,
+        notifications: NotificationScheduler(),
+        lockManager: AppLockManager(settings: settings)
+    )
+}
