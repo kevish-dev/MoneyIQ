@@ -13,6 +13,7 @@ struct HomeView: View {
     @Query private var categories: [ExpenseCategory]
 
     @State private var showingAddTransaction = false
+    @State private var showingScreenshotImport = false
     @State private var showingSettings = false
 
     var body: some View {
@@ -32,8 +33,28 @@ struct HomeView: View {
                     }
                     ForEach(transactions) { transaction in
                         HStack {
-                            VStack(alignment: .leading) {
-                                Text(transaction.category?.name ?? "Uncategorized")
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(spacing: 6) {
+                                    Text(transaction.merchantName ?? transaction.category?.name ?? "Uncategorized")
+                                    if transaction.isAutoImported {
+                                        Image(systemName: "text.viewfinder")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    if transaction.isBillLike {
+                                        Text("Bill")
+                                            .font(.caption2.weight(.semibold))
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(.orange.opacity(0.18), in: Capsule())
+                                            .foregroundStyle(.orange)
+                                    }
+                                }
+                                if let category = transaction.category {
+                                    Text(category.name)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                                 if let note = transaction.note {
                                     Text(note).font(.caption).foregroundStyle(.secondary)
                                 }
@@ -47,8 +68,17 @@ struct HomeView: View {
             .navigationTitle("MoneyIQ")
             .toolbar {
                 ToolbarItem {
-                    Button {
-                        showingAddTransaction = true
+                    Menu {
+                        Button {
+                            showingAddTransaction = true
+                        } label: {
+                            Label("Enter Manually", systemImage: "square.and.pencil")
+                        }
+                        Button {
+                            showingScreenshotImport = true
+                        } label: {
+                            Label("From Screenshot", systemImage: "text.viewfinder")
+                        }
                     } label: {
                         Label("Add", systemImage: "plus")
                     }
@@ -63,6 +93,9 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showingAddTransaction) {
                 AddTransactionView(categories: categories)
+            }
+            .sheet(isPresented: $showingScreenshotImport) {
+                ScreenshotImportView(categories: categories)
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView(

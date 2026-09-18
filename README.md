@@ -40,9 +40,10 @@ order — a feature only starts once whatever it needs already exists.
 
 ## What's actually built right now
 
-This repo currently implements **Phase 1 (Foundation)** and the free-tier
-slice of **Phase 2 (Apple-Native Essentials)**, deliberately scoped to work
-without a paid Apple Developer Program membership:
+This repo currently implements **Phase 1 (Foundation)**, the free-tier slice
+of **Phase 2 (Apple-Native Essentials)**, and **Phase 3 (Screenshot Capture &
+Auto-Processing)**, deliberately scoped to work without a paid Apple
+Developer Program membership:
 
 - **Unified auth across providers.** Sign in with Google and sign in with
   GitHub both work today, via `ASWebAuthenticationSession` + PKCE — no
@@ -72,11 +73,24 @@ without a paid Apple Developer Program membership:
   `UNUserNotificationCenter` — no push entitlement needed. Turning either on
   triggers a proper permission-request flow, with a deep link to System
   Settings if the user has notifications denied.
+- **Screenshot-based expense capture, fully on-device.** Pick a payment
+  screenshot (Google Pay, PhonePe, Paytm, bank, wallet — anything), and
+  Vision's `RecognizeTextRequest` OCRs it, then heuristics pull out the
+  amount, merchant, and date. The image is only ever held in memory for
+  parsing — nothing is written to disk or uploaded. A review screen lets you
+  confirm or correct every field before it's saved as a real transaction.
+- **Auto-detect bills.** Screenshots whose text matches bill-like keywords
+  (EMI, recharge, electricity, subscription, rent, etc.) are flagged as
+  recurring bills automatically.
+- **Merchant-based auto-categorization that learns.** The first time you
+  categorize a transaction from a given merchant, MoneyIQ remembers it
+  (`MerchantCategoryMapping`) — the next screenshot from that merchant
+  pre-selects the same category.
 - **Fully offline** — no CloudKit sync yet, everything lives in a local
   SwiftData store (`cloudKitDatabase: .none`).
 
-Everything else in the vision above — screenshot parsing, ML categorization,
-insights, widgets, Siri, Live Activities, CloudKit sync/Handoff, shared
+Everything else in the vision above — ML-driven spending insights, widgets,
+Siri, Live Activities, CloudKit sync/Handoff, shared
 budgets — comes in later phases once its prerequisites exist (see
 [Roadmap / deferred work](#roadmap--deferred-work-needs-a-paid-apple-developer-program)
 below).
@@ -179,8 +193,8 @@ Per the PRD's dependency table, these stay off until you enroll
 - Push-based financial notifications (need an APNs key/certificate) — the
   on-device daily/weekly reminders above don't need this either
 - Siri Shortcuts / App Intents
-- Screenshot upload + on-device ML parsing, auto-categorization, spending
-  trends, anomaly detection, subscription detection, cash-flow forecast, net
-  worth tracking — these don't need the paid program technically, but they
-  build on a meaningful transaction history and are sequenced for later
+- Spending trends, anomaly detection, subscription detection, cash-flow
+  forecast, net worth tracking — these don't need the paid program
+  technically, but they build on a meaningful transaction history (screenshot
+  import + manual entry are both live now) and are sequenced for later
   phases per the PRD's dependency ordering

@@ -24,6 +24,10 @@ public final class ExpenseTransaction {
     /// Left false for manual entries.
     public var isAutoImported: Bool
 
+    /// Heuristically flagged as a recurring bill (EMI, subscription, utility,
+    /// etc.) at import time — Phase 3's "auto-detect bills."
+    public var isBillLike: Bool
+
     public var category: ExpenseCategory?
 
     public init(
@@ -34,6 +38,7 @@ public final class ExpenseTransaction {
         merchantName: String? = nil,
         paymentMethod: PaymentMethod = .cash,
         isAutoImported: Bool = false,
+        isBillLike: Bool = false,
         category: ExpenseCategory? = nil,
         createdAt: Date = .now
     ) {
@@ -44,6 +49,7 @@ public final class ExpenseTransaction {
         self.merchantName = merchantName
         self.paymentMethod = paymentMethod
         self.isAutoImported = isAutoImported
+        self.isBillLike = isBillLike
         self.category = category
         self.createdAt = createdAt
     }
