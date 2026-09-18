@@ -40,9 +40,9 @@ order — a feature only starts once whatever it needs already exists.
 
 ## What's actually built right now
 
-This repo currently implements the earliest slice of **Phase 1
-(Foundation)**, deliberately scoped to work without a paid Apple Developer
-Program membership:
+This repo currently implements **Phase 1 (Foundation)** and the free-tier
+slice of **Phase 2 (Apple-Native Essentials)**, deliberately scoped to work
+without a paid Apple Developer Program membership:
 
 - **Unified auth across providers.** Sign in with Google and sign in with
   GitHub both work today, via `ASWebAuthenticationSession` + PKCE — no
@@ -57,6 +57,21 @@ Program membership:
   `ExpenseTransaction`, `Budget`, `ReminderItem`.
 - **Manual transaction entry**, a monthly budget cap model, and basic
   onboarding (name, mobile, age, income, preferred currency).
+- **Native Liquid Glass UI** (iOS 26 / macOS 26): an animated splash screen,
+  a sign-in screen built from real `.glassEffect`/`GlassEffectContainer`
+  materials, a live glass "M" wordmark, a rendered app icon, and real brand
+  marks (official Google "G" and GitHub Octocat vector assets) on the
+  Google/GitHub buttons, each styled per that provider's own button
+  guidelines (white for Google, dark for GitHub, black for Apple).
+- **Face ID / Touch ID app lock.** Toggle it on in Settings and the app gates
+  Home behind biometric auth, re-engaging every time the app returns to the
+  foreground. Falls back gracefully (disabled, with an explanation) when no
+  biometry is enrolled.
+- **Local notification reminders.** A daily "log today's spending" nudge and
+  a weekly summary, both scheduled entirely on-device via
+  `UNUserNotificationCenter` — no push entitlement needed. Turning either on
+  triggers a proper permission-request flow, with a deep link to System
+  Settings if the user has notifications denied.
 - **Fully offline** — no CloudKit sync yet, everything lives in a local
   SwiftData store (`cloudKitDatabase: .none`).
 
@@ -71,8 +86,10 @@ below).
 - `MoneyIQCore/` — Swift package shared by both apps: SwiftData models, auth
   logic, persistence. Has its own test target.
 - `iOS/MoneyIQ/`, `macOS/MoneyIQ/` — thin app entry points per platform.
-- `Shared/` — SwiftUI views shared by both app targets (sign-in, onboarding,
-  home).
+- `Shared/` — SwiftUI views shared by both app targets (splash, sign-in,
+  onboarding, home, settings, app lock) plus `DesignSystem/` for the shared
+  Liquid Glass backdrop and logo, and `Assets.xcassets` for the app icon and
+  brand marks.
 - `project.yml` — [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec. The
   `.xcodeproj` is generated from this and is gitignored — never edit it by
   hand, edit `project.yml` and regenerate.
@@ -83,8 +100,9 @@ below).
 
 ### Prerequisites
 
-- Xcode 16+ (Swift 5.10 / SwiftData / `@Observable` need iOS 17+ / macOS 14+
-  SDKs)
+- Xcode with the iOS 26 / macOS 26 SDKs (Liquid Glass — `.glassEffect`,
+  `GlassEffectContainer`, `.buttonStyle(.glass...)` — needs these; deployment
+  target is set to 26.0 in `project.yml`)
 - [Homebrew](https://brew.sh)
 - A free Apple ID is enough — no paid Developer Program needed for anything
   currently implemented
@@ -156,8 +174,10 @@ Per the PRD's dependency table, these stay off until you enroll
 - CloudKit sync, Handoff, shared/family budgets (switch
   `PersistenceController`'s `cloudKitDatabase` from `.none`)
 - Home/Lock Screen widgets, Live Activities (need the App Groups
-  entitlement)
-- Push-based financial notifications (need an APNs key/certificate)
+  entitlement) — local notifications (daily/weekly reminders) are already
+  live and don't need this
+- Push-based financial notifications (need an APNs key/certificate) — the
+  on-device daily/weekly reminders above don't need this either
 - Siri Shortcuts / App Intents
 - Screenshot upload + on-device ML parsing, auto-categorization, spending
   trends, anomaly detection, subscription detection, cash-flow forecast, net
