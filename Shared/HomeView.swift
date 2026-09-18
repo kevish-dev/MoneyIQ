@@ -8,9 +8,13 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \ExpenseTransaction.date, order: .reverse) private var transactions: [ExpenseTransaction]
     @Query private var categories: [ExpenseCategory]
+    @Query(sort: \Budget.createdAt, order: .reverse) private var budgets: [Budget]
 
     @State private var showingAddTransaction = false
     @State private var showingScreenshotImport = false
+    #if os(iOS)
+    @State private var liveActivityManager = BudgetLiveActivityManager()
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -90,8 +94,37 @@ struct HomeView: View {
             .sheet(isPresented: $showingScreenshotImport) {
                 ScreenshotImportView(categories: categories)
             }
+            #if os(iOS)
+            // Keeps the Lock Screen / Dynamic Island Live Activity in sync
+            // with real budget data whenever it changes — deliberately
+            // automatic (no separate toggle) since it mirrors state already
+            // visible in the app rather than notifying about anything new.
+            .task(id: liveActivitySyncKey) {
+                guard let budget = budgets.first, let account = authManager.currentAccount else { return }
+                let progress = BudgetEngine.monthProgress(for: budget, transactions: transactions)
+                if liveActivityManager.isActive {
+                    await liveActivityManager.update(
+                        spent: progress.spent,
+                        cap: progress.effectiveCap,
+                        currencyCode: account.preferredCurrencyCode
+                    )
+                } else {
+                    liveActivityManager.start(
+                        spent: progress.spent,
+                        cap: progress.effectiveCap,
+                        currencyCode: account.preferredCurrencyCode
+                    )
+                }
+            }
+            #endif
         }
     }
+
+    #if os(iOS)
+    private var liveActivitySyncKey: String {
+        "\(budgets.first?.id.uuidString ?? "none")-\(transactions.count)"
+    }
+    #endif
 
     private var account: UserAccount? { authManager.currentAccount }
 }

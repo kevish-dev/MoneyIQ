@@ -39,6 +39,8 @@
 	<string>$(MIQ_GOOGLE_REDIRECT_URI)</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>MoneyIQ uses Face ID to keep your financial data private.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

@@ -43,9 +43,9 @@ order — a feature only starts once whatever it needs already exists.
 This repo currently implements **Phase 1 (Foundation)**, the free-tier slice
 of **Phase 2 (Apple-Native Essentials)**, **Phase 3 (Screenshot Capture &
 Auto-Processing)**, the free-tier slice of **Phase 4 (Intelligence &
-Insights)**, and the free-tier slice of **Phase 5 (Budgeting Depth)**,
-deliberately scoped to work without a paid Apple Developer Program
-membership:
+Insights)**, the free-tier slice of **Phase 5 (Budgeting Depth)**, and most
+of **Phase 6 (Advanced Apple-Native Integration)**, deliberately scoped to
+work without a paid Apple Developer Program membership:
 
 - **Unified auth across providers.** Sign in with Google and sign in with
   GitHub both work today, via `ASWebAuthenticationSession` + PKCE — no
@@ -117,12 +117,30 @@ membership:
   rescheduled with your real spend-to-date whenever Settings appears or the
   schedule changes, since a local notification's content is fixed at
   schedule time.
+- **Siri Shortcuts / App Intents.** "Log an expense in MoneyIQ" — Siri then
+  prompts for the amount, matching the PRD's "Log ₹200 for lunch" example.
+  Runs in the main app's own process (a plain `AppIntent`, not a separate
+  extension), so it reads/writes the same on-disk SwiftData store — no App
+  Groups needed. Verified end-to-end (not just compiled) via a scratch
+  harness that calls `perform()` directly and confirms the transaction lands.
+- **Live Activities.** Real-time budget tracking on the Lock Screen and
+  Dynamic Island, via a genuine widget extension target (`MoneyIQWidgets`)
+  and `ActivityKit`, kept in sync with real spend/cap data whenever it
+  changes. Entirely local — the app itself calls `Activity.update`, no
+  APNs/push needed for this on-device usage.
+- **A worth-flagging finding:** the PRD's own dependency table marks Siri/App
+  Intents and Live Activities as needing the paid Developer Program. Empirically,
+  neither did — both build, code-sign, and run on this repo's free personal
+  team, because in this app's shape they run in-process (App Intents) or need
+  no App Groups (Live Activities updated only by the app itself, no push).
+  Worth relaying since it means Phase 6 didn't actually need to wait.
 - **Fully offline** — no CloudKit sync yet, everything lives in a local
   SwiftData store (`cloudKitDatabase: .none`).
 
-Everything else in the vision above — widgets, Siri, Live Activities,
-CloudKit sync/Handoff, shared
-budgets — comes in later phases once its prerequisites exist (see
+Everything else in the vision above — Home/Lock Screen widgets (as opposed
+to the Live Activity above, which is a different WidgetKit surface),
+CloudKit sync/Handoff, and shared budgets — comes in later phases once its
+prerequisites exist (see
 [Roadmap / deferred work](#roadmap--deferred-work-needs-a-paid-apple-developer-program)
 below).
 
@@ -131,6 +149,8 @@ below).
 - `MoneyIQCore/` — Swift package shared by both apps: SwiftData models, auth
   logic, persistence. Has its own test target.
 - `iOS/MoneyIQ/`, `macOS/MoneyIQ/` — thin app entry points per platform.
+- `iOS/MoneyIQWidgets/` — the widget extension target hosting the budget
+  Live Activity (iOS-only; ActivityKit doesn't exist on macOS).
 - `Shared/` — SwiftUI views shared by both app targets (splash, sign-in,
   onboarding, home, settings, app lock) plus `DesignSystem/` for the shared
   Liquid Glass backdrop and logo, and `Assets.xcassets` for the app icon and
@@ -216,14 +236,16 @@ Per the PRD's dependency table, these stay off until you enroll
 
 - Sign in with Apple (`AppleAuthProvider.isEnabledByBuild = true` + add the
   capability in Xcode)
-- CloudKit sync, Handoff, shared/family budgets (switch
-  `PersistenceController`'s `cloudKitDatabase` from `.none`)
-- Home/Lock Screen widgets, Live Activities (need the App Groups
-  entitlement) — local notifications (daily/weekly reminders) are already
-  live and don't need this
-- Push-based financial notifications (need an APNs key/certificate) — the
-  on-device daily/weekly reminders above don't need this either
-- Siri Shortcuts / App Intents
+- CloudKit sync — the actual blocker behind everything below
+- Handoff (Phase 6) — the API itself (`NSUserActivity`) doesn't strictly
+  need CloudKit, but without synced data, handing off to another device
+  wouldn't find the same transactions/state there. Deferred until CloudKit
+  sync exists to make it actually useful, not because of a hard entitlement
+  requirement.
+- Home/Lock Screen widgets (Phase 2) — unlike the Live Activity above, a
+  static home screen widget is a genuinely separate process that needs to
+  read the same data as the app, which needs the App Groups entitlement
 - Shared/family budgets (Phase 5) — needs CloudKit shared zones plus a
-  permissions model; rollover and goal-based savings, the rest of Phase 5,
-  are already live above since they don't need CloudKit
+  permissions model
+- Push-based financial notifications (need an APNs key/certificate) — the
+  on-device daily/weekly reminders already live above don't need this

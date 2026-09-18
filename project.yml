@@ -27,6 +27,7 @@ targets:
       properties:
         UILaunchScreen: {}
         NSFaceIDUsageDescription: "MoneyIQ uses Face ID to keep your financial data private."
+        NSSupportsLiveActivities: true
         MIQ_GOOGLE_CLIENT_ID: $(MIQ_GOOGLE_CLIENT_ID)
         MIQ_GOOGLE_REDIRECT_URI: $(MIQ_GOOGLE_REDIRECT_URI)
         MIQ_GITHUB_CLIENT_ID: $(MIQ_GITHUB_CLIENT_ID)
@@ -42,6 +43,31 @@ targets:
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"
+    dependencies:
+      - package: MoneyIQCore
+      - target: MoneyIQWidgets
+        embed: true
+
+  MoneyIQWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: iOS/MoneyIQWidgets
+    info:
+      path: iOS/MoneyIQWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: MoneyIQ Widgets
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.moneyiq.ios.widgets
+        PRODUCT_NAME: MoneyIQWidgets
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        SKIP_INSTALL: true
+        GENERATE_INFOPLIST_FILE: false
     dependencies:
       - package: MoneyIQCore
 
