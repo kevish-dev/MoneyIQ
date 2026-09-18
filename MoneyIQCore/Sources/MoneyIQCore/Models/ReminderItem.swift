@@ -8,8 +8,8 @@ public enum ReminderFrequency: String, Codable, CaseIterable {
     case monthly
 }
 
-/// Data model placeholder for Phase 7 custom payment reminders. Scheduling
-/// (local notifications) is wired up in Phase 2 — this just holds the shape.
+/// Phase 7's custom payment reminders. Scheduling is handled by
+/// `NotificationScheduler.scheduleReminder`.
 @Model
 public final class ReminderItem {
     @Attribute(.unique) public var id: UUID

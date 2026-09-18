@@ -86,6 +86,12 @@ struct SettingsView: View {
                     displayedComponents: .hourAndMinute
                 )
             }
+
+            NavigationLink {
+                RemindersView(authManager: authManager, notifications: notifications)
+            } label: {
+                Label("Custom Payment Reminders", systemImage: "bell.badge")
+            }
         } header: {
             Text("Notifications")
         } footer: {

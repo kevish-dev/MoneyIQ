@@ -40,12 +40,14 @@ order — a feature only starts once whatever it needs already exists.
 
 ## What's actually built right now
 
-This repo currently implements **Phase 1 (Foundation)**, the free-tier slice
-of **Phase 2 (Apple-Native Essentials)**, **Phase 3 (Screenshot Capture &
-Auto-Processing)**, the free-tier slice of **Phase 4 (Intelligence &
-Insights)**, the free-tier slice of **Phase 5 (Budgeting Depth)**, and most
-of **Phase 6 (Advanced Apple-Native Integration)**, deliberately scoped to
-work without a paid Apple Developer Program membership:
+This repo currently implements **every phase of the PRD that doesn't
+strictly need CloudKit** — Phases 1 through 7, at least in the slice that
+doesn't require a paid Apple Developer Program membership. What's left
+(shared/family budgets, Handoff, cross-device sync, Home Screen widgets,
+push notifications) all trace back to the same two things: CloudKit and the
+App Groups entitlement, both paid-gated — see
+[Roadmap / deferred work](#roadmap--deferred-work-needs-a-paid-apple-developer-program)
+below.
 
 - **Unified auth across providers.** Sign in with Google and sign in with
   GitHub both work today, via `ASWebAuthenticationSession` + PKCE — no
@@ -134,6 +136,13 @@ work without a paid Apple Developer Program membership:
   team, because in this app's shape they run in-process (App Intents) or need
   no App Groups (Live Activities updated only by the app itself, no push).
   Worth relaying since it means Phase 6 didn't actually need to wait.
+- **Custom payment reminders.** Title, amount, frequency (once/daily/weekly/
+  monthly), and a time — each schedules its own local notification. Ties
+  back into Phase 3/4: a "Suggested" section surfaces recurring merchants
+  detected by `InsightsEngine.recurringSubscriptions` that don't have a
+  reminder yet, one tap away from becoming one, matching the PRD's own note
+  that this phase "benefits from Auto-Detect Bills for suggesting
+  reminders." Reachable from Settings → Notifications.
 - **Fully offline** — no CloudKit sync yet, everything lives in a local
   SwiftData store (`cloudKitDatabase: .none`).
 

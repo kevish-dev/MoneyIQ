@@ -110,4 +110,51 @@ public final class NotificationScheduler {
     public func cancelWeeklySummary() {
         center.removePendingNotificationRequests(withIdentifiers: [NotificationID.weeklySummary])
     }
+
+    // MARK: - Custom payment reminders (Phase 7)
+
+    private func reminderIdentifier(_ reminder: ReminderItem) -> String {
+        "com.moneyiq.notifications.reminder.\(reminder.id.uuidString)"
+    }
+
+    /// Schedules (or, if disabled, cancels) a custom reminder. `time` is
+    /// read for whichever components its frequency actually uses — day+time
+    /// for `.once`/`.monthly`, weekday+time for `.weekly`, just time for
+    /// `.daily` — everything else in the stored `Date` is ignored.
+    public func scheduleReminder(_ reminder: ReminderItem, currencyCode: String, calendar: Calendar = .current) {
+        let id = reminderIdentifier(reminder)
+        center.removePendingNotificationRequests(withIdentifiers: [id])
+        guard reminder.isEnabled else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = reminder.title
+        if let amount = reminder.amount {
+            content.body = "Payment of \(amount.formatted(.currency(code: currencyCode))) due"
+        } else {
+            content.body = "Payment reminder"
+        }
+        content.sound = .default
+
+        let trigger: UNCalendarNotificationTrigger
+        switch reminder.frequency {
+        case .once:
+            let comps = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: reminder.time)
+            trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        case .daily:
+            let comps = calendar.dateComponents([.hour, .minute], from: reminder.time)
+            trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
+        case .weekly:
+            let comps = calendar.dateComponents([.weekday, .hour, .minute], from: reminder.time)
+            trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
+        case .monthly:
+            let comps = calendar.dateComponents([.day, .hour, .minute], from: reminder.time)
+            trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
+        }
+
+        center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
+    }
+
+    public func cancelReminder(_ reminder: ReminderItem) {
+        center.removePendingNotificationRequests(withIdentifiers: [reminderIdentifier(reminder)])
+    }
 }
