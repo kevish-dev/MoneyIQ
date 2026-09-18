@@ -143,6 +143,16 @@ below.
   reminder yet, one tap away from becoming one, matching the PRD's own note
   that this phase "benefits from Auto-Detect Bills for suggesting
   reminders." Reachable from Settings → Notifications.
+- **Split — person-to-person IOU tracking.** Not in the original PRD; added
+  by request. Track who owes whom outside your own budget — "I borrowed
+  ₹20,000 from my friend, then paid ₹2,000 for his shopping, now I want to
+  settle up." Every entry is just a direction (`.iPaid` / `.theyPaid`) and
+  an amount; the running balance falls out of summing them (`LedgerEngine`),
+  so borrowing, covering someone else's expense, and settling up (fully or
+  partially) are all the same underlying operation, no special-cased debt
+  math. "Settle Up" prefills the exact amount needed to zero the balance,
+  editable for a partial settlement. A `Split` tab lists every contact with
+  their live balance; tapping one shows the full history as an audit trail.
 - **Fully offline** — no CloudKit sync yet, everything lives in a local
   SwiftData store (`cloudKitDatabase: .none`).
 

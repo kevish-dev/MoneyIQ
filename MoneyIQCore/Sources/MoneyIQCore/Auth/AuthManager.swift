@@ -50,6 +50,27 @@ public final class AuthManager {
         UserDefaults.standard.removeObject(forKey: Self.currentAccountIDKey)
     }
 
+    #if DEBUG
+    /// Bypasses real sign-in entirely so the rest of the app can be clicked
+    /// through without OAuth credentials configured. Debug-only by build
+    /// configuration — compiled out of Release entirely, not just hidden
+    /// behind a flag, so it can never ship.
+    public func signInAsTestUser() {
+        let testEmail = "test@moneyiq.local"
+        let descriptor = FetchDescriptor<UserAccount>(predicate: #Predicate { $0.email == testEmail })
+        let account: UserAccount
+        if let existing = try? modelContext.fetch(descriptor).first {
+            account = existing
+        } else {
+            account = UserAccount(firstName: "Test", lastName: "User", email: testEmail)
+            modelContext.insert(account)
+            try? modelContext.save()
+        }
+        currentAccount = account
+        UserDefaults.standard.set(account.id.uuidString, forKey: Self.currentAccountIDKey)
+    }
+    #endif
+
     private func restoreSession() {
         guard
             let idString = UserDefaults.standard.string(forKey: Self.currentAccountIDKey),

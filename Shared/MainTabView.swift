@@ -12,6 +12,9 @@ struct MainTabView: View {
             Tab("Home", systemImage: "house.fill") {
                 HomeView(authManager: authManager)
             }
+            Tab("Split", systemImage: "person.2.fill") {
+                LedgerView(authManager: authManager)
+            }
             Tab("Insights", systemImage: "chart.line.uptrend.xyaxis") {
                 InsightsView(authManager: authManager)
             }

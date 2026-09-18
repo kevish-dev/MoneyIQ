@@ -42,6 +42,14 @@ struct SignInView: View {
                         .padding(.horizontal, 32)
                 }
 
+                #if DEBUG
+                Button("Skip Sign In (Debug)") {
+                    authManager.signInAsTestUser()
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                #endif
+
                 Spacer(minLength: 32)
             }
             .padding()
