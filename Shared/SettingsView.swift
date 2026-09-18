@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import MoneyIQCore
 
 struct SettingsView: View {
@@ -7,6 +8,7 @@ struct SettingsView: View {
     @Bindable var notifications: NotificationScheduler
     let lockManager: AppLockManager
 
+    @Query(sort: \ExpenseTransaction.date) private var transactions: [ExpenseTransaction]
     @State private var notificationDeniedAlertKind: NotificationToggleKind?
 
     private enum NotificationToggleKind {
@@ -33,6 +35,11 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Turn on notifications for MoneyIQ in Settings to enable reminders.")
+            }
+            .task {
+                if settings.isWeeklySummaryEnabled {
+                    rescheduleWeeklySummary()
+                }
             }
         }
     }
@@ -136,13 +143,33 @@ struct SettingsView: View {
                     let granted = await notifications.requestPermissionIfNeeded()
                     if granted {
                         settings.isWeeklySummaryEnabled = true
-                        notifications.scheduleWeeklySummary(weekday: settings.weeklySummaryWeekday, time: settings.weeklySummaryTime)
+                        rescheduleWeeklySummary()
                     } else {
                         settings.isWeeklySummaryEnabled = false
                         notificationDeniedAlertKind = .weekly
                     }
                 }
             }
+        )
+    }
+
+    /// Local notification content is fixed at schedule time, so this
+    /// recomputes real spending numbers (via `InsightsEngine`) and
+    /// re-registers the notification — called whenever the schedule changes
+    /// and once more whenever Settings appears, so the number stays fresh.
+    private func rescheduleWeeklySummary() {
+        let forecast = InsightsEngine.cashFlowForecast(
+            transactions: transactions,
+            monthlyIncome: authManager.currentAccount?.monthlyIncome ?? 0
+        )
+        let currencyCode = authManager.currentAccount?.preferredCurrencyCode ?? "USD"
+        let spentText = forecast.spentSoFarThisMonth.formatted(.currency(code: currencyCode))
+        let body = "You've spent \(spentText) so far this month. Open MoneyIQ to see the full breakdown."
+
+        notifications.scheduleWeeklySummary(
+            weekday: settings.weeklySummaryWeekday,
+            time: settings.weeklySummaryTime,
+            body: body
         )
     }
 
@@ -158,7 +185,7 @@ struct SettingsView: View {
                     notifications.scheduleDailyReminder(at: settings.dailyReminderTime)
                 }
                 if settings.isWeeklySummaryEnabled {
-                    notifications.scheduleWeeklySummary(weekday: settings.weeklySummaryWeekday, time: settings.weeklySummaryTime)
+                    rescheduleWeeklySummary()
                 }
             }
         )

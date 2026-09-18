@@ -81,12 +81,17 @@ public final class NotificationScheduler {
     }
 
     /// `weekday` is 1 = Sunday ... 7 = Saturday, matching `Calendar.Component.weekday`.
-    public func scheduleWeeklySummary(weekday: Int, time: DateComponents) {
+    /// `body` lets the caller pass real, computed spending data (see
+    /// `InsightsEngine`) instead of generic boilerplate — since a local
+    /// notification's content is fixed at schedule time, callers should
+    /// reschedule this periodically (e.g. whenever the app foregrounds) to
+    /// keep it fresh.
+    public func scheduleWeeklySummary(weekday: Int, time: DateComponents, body: String? = nil) {
         center.removePendingNotificationRequests(withIdentifiers: [NotificationID.weeklySummary])
 
         let content = UNMutableNotificationContent()
         content.title = "Your weekly summary is ready"
-        content.body = "See how last week's spending stacked up against your budget."
+        content.body = body ?? "See how last week's spending stacked up against your budget."
         content.sound = .default
 
         var trigger = DateComponents()

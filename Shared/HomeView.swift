@@ -4,9 +4,6 @@ import MoneyIQCore
 
 struct HomeView: View {
     let authManager: AuthManager
-    let settings: AppSettingsStore
-    let notifications: NotificationScheduler
-    let lockManager: AppLockManager
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \ExpenseTransaction.date, order: .reverse) private var transactions: [ExpenseTransaction]
@@ -14,7 +11,6 @@ struct HomeView: View {
 
     @State private var showingAddTransaction = false
     @State private var showingScreenshotImport = false
-    @State private var showingSettings = false
 
     var body: some View {
         NavigationStack {
@@ -83,27 +79,12 @@ struct HomeView: View {
                         Label("Add", systemImage: "plus")
                     }
                 }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                }
             }
             .sheet(isPresented: $showingAddTransaction) {
                 AddTransactionView(categories: categories)
             }
             .sheet(isPresented: $showingScreenshotImport) {
                 ScreenshotImportView(categories: categories)
-            }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView(
-                    authManager: authManager,
-                    settings: settings,
-                    notifications: notifications,
-                    lockManager: lockManager
-                )
             }
         }
     }

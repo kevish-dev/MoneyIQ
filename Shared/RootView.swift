@@ -21,7 +21,7 @@ struct RootView: View {
                     if lockManager!.isLocked {
                         AppLockView(lockManager: lockManager!)
                     } else {
-                        HomeView(
+                        MainTabView(
                             authManager: authManager!,
                             settings: settingsStore,
                             notifications: notificationScheduler,

@@ -41,9 +41,10 @@ order — a feature only starts once whatever it needs already exists.
 ## What's actually built right now
 
 This repo currently implements **Phase 1 (Foundation)**, the free-tier slice
-of **Phase 2 (Apple-Native Essentials)**, and **Phase 3 (Screenshot Capture &
-Auto-Processing)**, deliberately scoped to work without a paid Apple
-Developer Program membership:
+of **Phase 2 (Apple-Native Essentials)**, **Phase 3 (Screenshot Capture &
+Auto-Processing)**, and the free-tier slice of **Phase 4 (Intelligence &
+Insights)**, deliberately scoped to work without a paid Apple Developer
+Program membership:
 
 - **Unified auth across providers.** Sign in with Google and sign in with
   GitHub both work today, via `ASWebAuthenticationSession` + PKCE — no
@@ -86,11 +87,30 @@ Developer Program membership:
   categorize a transaction from a given merchant, MoneyIQ remembers it
   (`MerchantCategoryMapping`) — the next screenshot from that merchant
   pre-selects the same category.
+- **Spending trends and category breakdown**, charted with Swift Charts —
+  a 6-month bar trend and a per-category donut for the current month.
+- **Anomaly detection.** Transactions notably larger than your own average
+  for that category get flagged with an explanation ("2.3x your usual Food
+  spend"), not a black-box score.
+- **Recurring subscription detection.** Merchants that repeat roughly
+  monthly at a roughly stable amount are surfaced with their expected next
+  charge date, building on Phase 3's merchant tracking.
+- **Cash flow forecast.** A projected end-of-month balance from your monthly
+  income (captured at onboarding), what you've spent so far this month, and
+  bill-like transactions from last month not yet repeated this month.
+- **Net worth tracker.** A standalone assets/liabilities list (`NetWorthAccount`)
+  with a running total — independent of transaction history, as the PRD
+  calls for.
+- **Home / Insights / Net Worth / Settings tabs** — Settings moved out of a
+  sheet into a proper tab now that there are multiple top-level sections.
+  The weekly summary notification is also data-driven now: it's rescheduled
+  with your real spend-to-date whenever Settings appears or the schedule
+  changes, since a local notification's content is fixed at schedule time.
 - **Fully offline** — no CloudKit sync yet, everything lives in a local
   SwiftData store (`cloudKitDatabase: .none`).
 
-Everything else in the vision above — ML-driven spending insights, widgets,
-Siri, Live Activities, CloudKit sync/Handoff, shared
+Everything else in the vision above — widgets, Siri, Live Activities,
+CloudKit sync/Handoff, shared
 budgets — comes in later phases once its prerequisites exist (see
 [Roadmap / deferred work](#roadmap--deferred-work-needs-a-paid-apple-developer-program)
 below).
@@ -193,8 +213,7 @@ Per the PRD's dependency table, these stay off until you enroll
 - Push-based financial notifications (need an APNs key/certificate) — the
   on-device daily/weekly reminders above don't need this either
 - Siri Shortcuts / App Intents
-- Spending trends, anomaly detection, subscription detection, cash-flow
-  forecast, net worth tracking — these don't need the paid program
-  technically, but they build on a meaningful transaction history (screenshot
-  import + manual entry are both live now) and are sequenced for later
-  phases per the PRD's dependency ordering
+- Rollover budgets, goal-based savings, shared/family budgets (Phase 5) —
+  don't need the paid program individually, but are sequenced for later
+  phases per the PRD's dependency ordering; shared budgets specifically need
+  CloudKit shared zones, which do need it

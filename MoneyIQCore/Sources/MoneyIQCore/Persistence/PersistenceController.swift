@@ -10,7 +10,8 @@ public enum PersistenceController {
         ExpenseTransaction.self,
         Budget.self,
         ReminderItem.self,
-        MerchantCategoryMapping.self
+        MerchantCategoryMapping.self,
+        NetWorthAccount.self
     ])
 
     /// Local-only store for now. `cloudKitDatabase: .none` is deliberate —
