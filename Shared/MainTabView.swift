@@ -8,10 +8,11 @@ struct MainTabView: View {
     let lockManager: AppLockManager
 
     var body: some View {
-        // Net Worth and Settings deliberately aren't tabs — they're visited
-        // far less often than the 5 below, so they live behind the profile
-        // icon (top-left of each tab, App Store-style) instead. "More" is
-        // gone; its slot is now the Live Activity customization screen.
+        // Net Worth, Settings, and Live Activity deliberately aren't tabs —
+        // they're visited far less often than the 5 below, so they live
+        // behind the profile icon (top-right of each tab, App Store-style)
+        // instead. Live Activity's old tab slot is now Projects (freelance
+        // client work), which earns a tab since it's a primary workflow.
         TabView {
             Tab("Home", systemImage: "house.fill") {
                 HomeView(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
@@ -25,13 +26,8 @@ struct MainTabView: View {
             Tab("Goals", systemImage: "target") {
                 GoalsView(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
             }
-            Tab("Live Activity", systemImage: "lock.display") {
-                LiveActivitySettingsView(
-                    authManager: authManager,
-                    settings: settings,
-                    notifications: notifications,
-                    lockManager: lockManager
-                )
+            Tab("Projects", systemImage: "briefcase.fill") {
+                ProjectsView(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
             }
         }
     }

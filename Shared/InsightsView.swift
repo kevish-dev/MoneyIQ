@@ -32,12 +32,16 @@ struct InsightsView: View {
         InsightsEngine.monthlyTotals(transactions: transactions)
     }
 
-    private var categoryShares: [InsightsEngine.CategoryShare] {
-        InsightsEngine.categoryShares(transactions: transactions, forMonthContaining: selectedMonth)
+    private var yearlyTotals: [InsightsEngine.YearlyTotal] {
+        InsightsEngine.yearlyTotals(transactions: transactions)
     }
 
-    private var dailySpend: [InsightsEngine.DailySpend] {
-        InsightsEngine.dailySpend(transactions: transactions, forMonthContaining: selectedMonth)
+    private var yearChange: InsightsEngine.YearOverYearChange {
+        InsightsEngine.yearOverYearChange(transactions: transactions, forYearContaining: selectedMonth)
+    }
+
+    private var categoryShares: [InsightsEngine.CategoryShare] {
+        InsightsEngine.categoryShares(transactions: transactions, forMonthContaining: selectedMonth)
     }
 
     private var monthTotalSpend: Decimal {
@@ -84,13 +88,12 @@ struct InsightsView: View {
                     if transactions.isEmpty {
                         emptyState
                     } else {
-                        spendChartHeroCard
+                        spendTrendCard
                         if isCurrentMonth {
                             cashFlowCard
                         } else {
                             monthSummaryCard
                         }
-                        trendSection
                         categoryBubbleSection
                         if !topMerchants.isEmpty { topMerchantsSection }
                         if !anomalies.isEmpty { anomalySection }
@@ -231,95 +234,26 @@ struct InsightsView: View {
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    /// Dark orange/red hero card with the selected month's total spend and
-    /// the interactive scrub/hover line chart — matches the design
-    /// reference's balance-card-plus-chart pattern (image 4).
-    private var spendChartHeroCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text(isCurrentMonth ? "Spent This Month" : "Spent That Month")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.8))
-                Spacer()
-                if let percent = monthChange.percentChange {
-                    Label(
-                        percent.formatted(.percent.precision(.fractionLength(1))),
-                        systemImage: percent >= 0 ? "arrow.up.right" : "arrow.down.right"
-                    )
-                    .font(.caption2.weight(.semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(AppTheme.pillBackgroundOnHero, in: Capsule())
-                    .foregroundStyle(.white)
+    /// Dark red-to-orange hero card: current-period total over a smooth
+    /// trend line, toggleable between a trailing 6-month and 5-year view,
+    /// with a scrubbable tooltip bubble — matches the design reference's
+    /// balance-card pattern.
+    private var spendTrendCard: some View {
+        SpendTrendCard(
+            monthlyTotals: monthlyTotals,
+            yearlyTotals: yearlyTotals,
+            currencyCode: currencyCode,
+            selectedMonth: selectedMonth,
+            selectedMonthTotal: monthTotalSpend,
+            selectedMonthPercentChange: monthChange.percentChange,
+            selectedYearTotal: yearChange.currentTotal,
+            selectedYearPercentChange: yearChange.percentChange,
+            onSelectMonth: { date in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedMonth = calendar.startOfMonth(for: date)
                 }
             }
-
-            Text(monthTotalSpend, format: .currency(code: currencyCode))
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-
-            if dailySpend.isEmpty {
-                Text("No spending that month.")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.7))
-                    .frame(height: 140)
-            } else {
-                InteractiveSpendChart(data: dailySpend, currencyCode: currencyCode)
-                    .frame(height: 160)
-            }
-        }
-        .padding(AppTheme.Spacing.large)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
-        .shadow(color: AppTheme.emberRed.opacity(0.3), radius: 16, y: 10)
-    }
-
-    /// A trailing-6-month bar chart — tap any bar to jump `selectedMonth`
-    /// there, so the month-by-month trend and the detailed per-month
-    /// sections above stay connected instead of being two separate views.
-    private var trendSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("6-Month Trend")
-                .font(.headline)
-            Chart(monthlyTotals) { bucket in
-                BarMark(
-                    x: .value("Month", bucket.monthStart, unit: .month),
-                    y: .value("Spend", NSDecimalNumber(decimal: bucket.total).doubleValue)
-                )
-                .foregroundStyle(
-                    calendar.isDate(bucket.monthStart, equalTo: selectedMonth, toGranularity: .month)
-                        ? AppTheme.accent
-                        : AppTheme.accent.opacity(0.35)
-                )
-                .cornerRadius(4)
-            }
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .month)) { value in
-                    AxisValueLabel(format: .dateTime.month(.abbreviated))
-                }
-            }
-            .chartYAxis(.hidden)
-            .frame(height: 120)
-            .chartOverlay { proxy in
-                GeometryReader { geometry in
-                    Rectangle()
-                        .fill(.clear)
-                        .contentShape(Rectangle())
-                        .onTapGesture { location in
-                            let origin = geometry[proxy.plotAreaFrame].origin
-                            guard let date: Date = proxy.value(atX: location.x - origin.x) else { return }
-                            guard let closest = monthlyTotals.min(by: {
-                                abs($0.monthStart.timeIntervalSince(date)) < abs($1.monthStart.timeIntervalSince(date))
-                            }) else { return }
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                selectedMonth = calendar.startOfMonth(for: closest.monthStart)
-                            }
-                        }
-                }
-            }
-        }
-        .padding(AppTheme.Spacing.large)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
+        )
     }
 
     /// The category bubble chart, plus a compact "top categories" stat row

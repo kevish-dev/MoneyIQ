@@ -22,6 +22,32 @@ struct InsightsEngineTests {
         #expect(totals[totals.count - 2].total == 50)
     }
 
+    @Test func yearlyTotalsBucketsCorrectlyAcrossYears() {
+        let now = Date()
+        let calendar = Calendar.current
+        let thisYearTx = makeTransaction(amount: 100, daysAgo: 1, now: now)
+        let lastYearDate = calendar.date(byAdding: .year, value: -1, to: now)!
+        let lastYearTx = ExpenseTransaction(amount: 50, date: lastYearDate)
+
+        let totals = InsightsEngine.yearlyTotals(transactions: [thisYearTx, lastYearTx], yearCount: 3, now: now)
+        #expect(totals.count == 3)
+        #expect(totals.last!.total == 100)
+        #expect(totals[totals.count - 2].total == 50)
+    }
+
+    @Test func yearOverYearChangeComputesPercentDelta() {
+        let now = Date()
+        let calendar = Calendar.current
+        let thisYearTx = makeTransaction(amount: 150, daysAgo: 1, now: now)
+        let lastYearDate = calendar.date(byAdding: .year, value: -1, to: now)!
+        let lastYearTx = ExpenseTransaction(amount: 100, date: lastYearDate)
+
+        let change = InsightsEngine.yearOverYearChange(transactions: [thisYearTx, lastYearTx], forYearContaining: now)
+        #expect(change.currentTotal == 150)
+        #expect(change.previousTotal == 100)
+        #expect(change.percentChange == 0.5)
+    }
+
     @Test func categoryBreakdownSumsPerCategoryForCurrentMonth() {
         let now = Date()
         let food = ExpenseCategory(name: "Food")

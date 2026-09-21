@@ -43,6 +43,13 @@ struct BackupManagerTests {
         let entry = LedgerEntry(amount: 500, direction: .iPaid, note: "Dinner split", contact: contact)
         sourceContext.insert(entry)
 
+        let project = FreelanceProject(name: "Website Redesign", clientName: "Acme", totalAmount: 100000, currencyCode: "INR")
+        sourceContext.insert(project)
+        let installment = PaymentInstallment(label: "Advance", amount: 30000, percentage: 30, isReceived: true, project: project)
+        sourceContext.insert(installment)
+        let reimbursement = ProjectReimbursement(title: "Domain", amount: 1200, project: project)
+        sourceContext.insert(reimbursement)
+
         try sourceContext.save()
 
         let data = try BackupManager.exportData(context: sourceContext)
@@ -56,7 +63,7 @@ struct BackupManagerTests {
         try destinationContext.save()
 
         let payload = try BackupManager.restore(from: data, context: destinationContext)
-        #expect(payload.totalRecordCount == 12)
+        #expect(payload.totalRecordCount == 15)
 
         let restoredCategories = try destinationContext.fetch(FetchDescriptor<ExpenseCategory>())
         #expect(restoredCategories.count == 1)
@@ -77,6 +84,11 @@ struct BackupManagerTests {
 
         let restoredContacts = try destinationContext.fetch(FetchDescriptor<LedgerContact>())
         #expect(restoredContacts.first?.entries.first?.amount == 500)
+
+        let restoredProjects = try destinationContext.fetch(FetchDescriptor<FreelanceProject>())
+        #expect(restoredProjects.first?.name == "Website Redesign")
+        #expect(restoredProjects.first?.installments.first?.amount == 30000)
+        #expect(restoredProjects.first?.reimbursements.first?.title == "Domain")
     }
 
     @Test func restoreRejectsGarbageData() {

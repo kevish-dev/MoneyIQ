@@ -24,6 +24,9 @@ public struct BackupPayload: Codable {
     public var savingsContributions: [SavingsContributionDTO]
     public var ledgerContacts: [LedgerContactDTO]
     public var ledgerEntries: [LedgerEntryDTO]
+    public var freelanceProjects: [FreelanceProjectDTO]
+    public var paymentInstallments: [PaymentInstallmentDTO]
+    public var projectReimbursements: [ProjectReimbursementDTO]
 
     public init(
         schemaVersion: Int = BackupPayload.currentSchemaVersion,
@@ -39,7 +42,10 @@ public struct BackupPayload: Codable {
         savingsGoals: [SavingsGoalDTO] = [],
         savingsContributions: [SavingsContributionDTO] = [],
         ledgerContacts: [LedgerContactDTO] = [],
-        ledgerEntries: [LedgerEntryDTO] = []
+        ledgerEntries: [LedgerEntryDTO] = [],
+        freelanceProjects: [FreelanceProjectDTO] = [],
+        paymentInstallments: [PaymentInstallmentDTO] = [],
+        projectReimbursements: [ProjectReimbursementDTO] = []
     ) {
         self.schemaVersion = schemaVersion
         self.exportedAt = exportedAt
@@ -55,6 +61,9 @@ public struct BackupPayload: Codable {
         self.savingsContributions = savingsContributions
         self.ledgerContacts = ledgerContacts
         self.ledgerEntries = ledgerEntries
+        self.freelanceProjects = freelanceProjects
+        self.paymentInstallments = paymentInstallments
+        self.projectReimbursements = projectReimbursements
     }
 
     /// Total record count across every entity — used for the "X records"
@@ -64,6 +73,7 @@ public struct BackupPayload: Codable {
             + expenseTransactions.count + budgets.count + reminderItems.count
             + merchantCategoryMappings.count + netWorthAccounts.count + savingsGoals.count
             + savingsContributions.count + ledgerContacts.count + ledgerEntries.count
+            + freelanceProjects.count + paymentInstallments.count + projectReimbursements.count
     }
 }
 
@@ -184,4 +194,39 @@ public struct LedgerEntryDTO: Codable {
     public var isSettlement: Bool
     public var createdAt: Date
     public var contactID: UUID?
+}
+
+public struct FreelanceProjectDTO: Codable {
+    public var id: UUID
+    public var name: String
+    public var clientName: String?
+    public var totalAmount: Decimal
+    public var currencyCode: String
+    public var notes: String?
+    public var createdAt: Date
+}
+
+public struct PaymentInstallmentDTO: Codable {
+    public var id: UUID
+    public var label: String
+    public var amount: Decimal
+    public var percentage: Decimal?
+    public var dueDate: Date?
+    public var isReceived: Bool
+    public var receivedDate: Date?
+    public var note: String?
+    public var createdAt: Date
+    public var projectID: UUID?
+}
+
+public struct ProjectReimbursementDTO: Codable {
+    public var id: UUID
+    public var title: String
+    public var amount: Decimal
+    public var date: Date
+    public var isRecovered: Bool
+    public var recoveredDate: Date?
+    public var note: String?
+    public var createdAt: Date
+    public var projectID: UUID?
 }

@@ -84,6 +84,16 @@ struct ProfileView: View {
                         Label("Net Worth", systemImage: "chart.pie.fill")
                     }
                     NavigationLink {
+                        LiveActivitySettingsView(
+                            authManager: authManager,
+                            settings: settings,
+                            notifications: notifications,
+                            lockManager: lockManager
+                        )
+                    } label: {
+                        Label("Live Activity", systemImage: "lock.display")
+                    }
+                    NavigationLink {
                         SettingsView(
                             authManager: authManager,
                             settings: settings,

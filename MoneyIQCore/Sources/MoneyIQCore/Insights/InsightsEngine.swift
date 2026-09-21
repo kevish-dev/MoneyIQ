@@ -10,6 +10,12 @@ public enum InsightsEngine {
         public let total: Decimal
     }
 
+    public struct YearlyTotal: Identifiable, Sendable {
+        public let id = UUID()
+        public let yearStart: Date
+        public let total: Decimal
+    }
+
     public struct CategoryTotal: Identifiable, Sendable {
         public let id = UUID()
         public let categoryName: String
@@ -87,6 +93,38 @@ public enum InsightsEngine {
         return buckets
             .sorted { $0.key < $1.key }
             .map { MonthlyTotal(monthStart: $0.key, total: $0.value) }
+    }
+
+    /// Total spend per calendar year, oldest first, for the trailing
+    /// `yearCount` years (including the current year) — the yearly-view
+    /// counterpart to `monthlyTotals`.
+    public static func yearlyTotals(
+        transactions: [ExpenseTransaction],
+        yearCount: Int = 5,
+        calendar: Calendar = .current,
+        now: Date = .now
+    ) -> [YearlyTotal] {
+        guard let earliestStart = calendar.date(byAdding: .year, value: -(yearCount - 1), to: calendar.startOfYear(for: now)) else {
+            return []
+        }
+
+        var buckets: [Date: Decimal] = [:]
+        var cursor = earliestStart
+        for _ in 0..<yearCount {
+            buckets[cursor] = 0
+            guard let next = calendar.date(byAdding: .year, value: 1, to: cursor) else { break }
+            cursor = next
+        }
+
+        for transaction in transactions {
+            let yearStart = calendar.startOfYear(for: transaction.date)
+            guard yearStart >= earliestStart else { continue }
+            buckets[yearStart, default: 0] += transaction.amount
+        }
+
+        return buckets
+            .sorted { $0.key < $1.key }
+            .map { YearlyTotal(yearStart: $0.key, total: $0.value) }
     }
 
     /// Category breakdown for a single month (defaults to the current one).
@@ -232,6 +270,44 @@ public enum InsightsEngine {
         guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return 0 }
         return transactions
             .filter { $0.date >= monthStart && $0.date < monthEnd }
+            .reduce(Decimal(0)) { $0 + $1.amount }
+    }
+
+    /// A year's total spend vs. the immediately preceding year, plus the
+    /// percent change — the yearly-view counterpart to `monthOverMonthChange`,
+    /// used by the trend card's header when toggled to "Yearly".
+    public struct YearOverYearChange: Sendable {
+        public let currentTotal: Decimal
+        public let previousTotal: Decimal
+        public let percentChange: Double?
+    }
+
+    public static func yearOverYearChange(
+        transactions: [ExpenseTransaction],
+        forYearContaining date: Date,
+        calendar: Calendar = .current
+    ) -> YearOverYearChange {
+        let yearStart = calendar.startOfYear(for: date)
+        let currentTotal = totalSpent(transactions: transactions, inYear: yearStart, calendar: calendar)
+
+        guard let previousYearStart = calendar.date(byAdding: .year, value: -1, to: yearStart) else {
+            return YearOverYearChange(currentTotal: currentTotal, previousTotal: 0, percentChange: nil)
+        }
+        let previousTotal = totalSpent(transactions: transactions, inYear: previousYearStart, calendar: calendar)
+
+        let percentChange: Double?
+        if previousTotal > 0 {
+            percentChange = NSDecimalNumber(decimal: (currentTotal - previousTotal) / previousTotal).doubleValue
+        } else {
+            percentChange = nil
+        }
+        return YearOverYearChange(currentTotal: currentTotal, previousTotal: previousTotal, percentChange: percentChange)
+    }
+
+    private static func totalSpent(transactions: [ExpenseTransaction], inYear yearStart: Date, calendar: Calendar) -> Decimal {
+        guard let yearEnd = calendar.date(byAdding: .year, value: 1, to: yearStart) else { return 0 }
+        return transactions
+            .filter { $0.date >= yearStart && $0.date < yearEnd }
             .reduce(Decimal(0)) { $0 + $1.amount }
     }
 
@@ -404,6 +480,11 @@ public enum InsightsEngine {
 public extension Calendar {
     func startOfMonth(for date: Date) -> Date {
         let comps = dateComponents([.year, .month], from: date)
+        return self.date(from: comps) ?? date
+    }
+
+    func startOfYear(for date: Date) -> Date {
+        let comps = dateComponents([.year], from: date)
         return self.date(from: comps) ?? date
     }
 }

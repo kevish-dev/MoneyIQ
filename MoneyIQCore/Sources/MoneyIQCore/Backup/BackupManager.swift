@@ -69,6 +69,9 @@ public enum BackupManager {
         let savingsContributions = try context.fetch(FetchDescriptor<SavingsContribution>())
         let ledgerContacts = try context.fetch(FetchDescriptor<LedgerContact>())
         let ledgerEntries = try context.fetch(FetchDescriptor<LedgerEntry>())
+        let freelanceProjects = try context.fetch(FetchDescriptor<FreelanceProject>())
+        let paymentInstallments = try context.fetch(FetchDescriptor<PaymentInstallment>())
+        let projectReimbursements = try context.fetch(FetchDescriptor<ProjectReimbursement>())
 
         return BackupPayload(
             userAccounts: userAccounts.map {
@@ -136,6 +139,25 @@ public enum BackupManager {
                 LedgerEntryDTO(
                     id: $0.id, amount: $0.amount, direction: $0.direction, note: $0.note, date: $0.date,
                     isSettlement: $0.isSettlement, createdAt: $0.createdAt, contactID: $0.contact?.id
+                )
+            },
+            freelanceProjects: freelanceProjects.map {
+                FreelanceProjectDTO(
+                    id: $0.id, name: $0.name, clientName: $0.clientName, totalAmount: $0.totalAmount,
+                    currencyCode: $0.currencyCode, notes: $0.notes, createdAt: $0.createdAt
+                )
+            },
+            paymentInstallments: paymentInstallments.map {
+                PaymentInstallmentDTO(
+                    id: $0.id, label: $0.label, amount: $0.amount, percentage: $0.percentage, dueDate: $0.dueDate,
+                    isReceived: $0.isReceived, receivedDate: $0.receivedDate, note: $0.note,
+                    createdAt: $0.createdAt, projectID: $0.project?.id
+                )
+            },
+            projectReimbursements: projectReimbursements.map {
+                ProjectReimbursementDTO(
+                    id: $0.id, title: $0.title, amount: $0.amount, date: $0.date, isRecovered: $0.isRecovered,
+                    recoveredDate: $0.recoveredDate, note: $0.note, createdAt: $0.createdAt, projectID: $0.project?.id
                 )
             }
         )
@@ -258,11 +280,40 @@ public enum BackupManager {
             ))
         }
 
+        var projectsByID: [UUID: FreelanceProject] = [:]
+        for dto in payload.freelanceProjects {
+            let project = FreelanceProject(
+                id: dto.id, name: dto.name, clientName: dto.clientName, totalAmount: dto.totalAmount,
+                currencyCode: dto.currencyCode, notes: dto.notes, createdAt: dto.createdAt
+            )
+            context.insert(project)
+            projectsByID[dto.id] = project
+        }
+
+        for dto in payload.paymentInstallments {
+            context.insert(PaymentInstallment(
+                id: dto.id, label: dto.label, amount: dto.amount, percentage: dto.percentage, dueDate: dto.dueDate,
+                isReceived: dto.isReceived, receivedDate: dto.receivedDate, note: dto.note,
+                project: dto.projectID.flatMap { projectsByID[$0] }, createdAt: dto.createdAt
+            ))
+        }
+
+        for dto in payload.projectReimbursements {
+            context.insert(ProjectReimbursement(
+                id: dto.id, title: dto.title, amount: dto.amount, date: dto.date, isRecovered: dto.isRecovered,
+                recoveredDate: dto.recoveredDate, note: dto.note,
+                project: dto.projectID.flatMap { projectsByID[$0] }, createdAt: dto.createdAt
+            ))
+        }
+
         try context.save()
         return payload
     }
 
     private static func eraseAllData(context: ModelContext) throws {
+        try context.delete(model: ProjectReimbursement.self)
+        try context.delete(model: PaymentInstallment.self)
+        try context.delete(model: FreelanceProject.self)
         try context.delete(model: LedgerEntry.self)
         try context.delete(model: LedgerContact.self)
         try context.delete(model: SavingsContribution.self)
