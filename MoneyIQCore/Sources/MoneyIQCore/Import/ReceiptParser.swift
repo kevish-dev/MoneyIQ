@@ -112,14 +112,30 @@ public enum ReceiptParser {
 
     // MARK: - Merchant
 
+    // Deliberately no bare "paid " prefix — nearly every payment app's
+    // header line reads "Paid ₹80" (amount, not a name), and "paid " would
+    // match that before ever reaching the real "To <name>" line below it.
+    // "paid to" alone covers the legitimate "Paid to Swiggy" phrasing.
     private static let merchantPrefixes = [
-        "paid to", "payment to", "sent to", "to ", "paid ", "received by"
+        "paid to", "payment to", "sent to", "to ", "received by"
     ]
 
     private static let ignoredLineFragments = [
         "successful", "transaction id", "upi ref", "reference no", "utr",
         "payment", "complete", "status", "amount", "bank", "wallet"
     ]
+
+    /// True for candidates that are actually an amount, not a name (e.g. a
+    /// prefix match landing on "₹80" or "2,000") — guards both extraction
+    /// paths below so a currency-shaped string never gets returned as the
+    /// merchant.
+    private static func looksLikeAmount(_ candidate: String) -> Bool {
+        let lowered = candidate.lowercased()
+        if lowered.hasPrefix("₹") || lowered.hasPrefix("rs") || lowered.hasPrefix("inr") {
+            return true
+        }
+        return Decimal(string: candidate.filter { !$0.isWhitespace }) != nil
+    }
 
     static func extractMerchant(from lines: [String]) -> String? {
         for line in lines {
@@ -128,7 +144,7 @@ public enum ReceiptParser {
                 if let range = lowered.range(of: prefix) {
                     let candidate = String(line[range.upperBound...])
                         .trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !candidate.isEmpty, candidate.count <= 40 {
+                    if !candidate.isEmpty, candidate.count <= 40, !looksLikeAmount(candidate) {
                         return candidate
                     }
                 }
@@ -141,9 +157,8 @@ public enum ReceiptParser {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             let lowered = trimmed.lowercased()
             guard trimmed.count >= 3, trimmed.count <= 40 else { continue }
-            guard Decimal(string: trimmed.filter { !$0.isWhitespace }) == nil else { continue }
+            guard !looksLikeAmount(trimmed) else { continue }
             guard !ignoredLineFragments.contains(where: lowered.contains) else { continue }
-            guard !lowered.hasPrefix("₹"), !lowered.hasPrefix("rs") else { continue }
             return trimmed
         }
         return nil

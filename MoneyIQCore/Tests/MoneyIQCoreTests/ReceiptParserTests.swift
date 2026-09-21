@@ -44,6 +44,15 @@ struct ReceiptParserTests {
         #expect(ReceiptParser.extractMerchant(from: lines) == "Reliance Digital")
     }
 
+    /// Reproduces a real screenshot (Slice app) where a bare "Paid ₹80"
+    /// header line was matching the "paid " merchant prefix before the
+    /// actual "To <name>" line was ever reached, returning "₹80" as the
+    /// "merchant" instead of the payee's name.
+    @Test func doesNotMistakeThePaidAmountHeaderForTheMerchant() {
+        let lines = ["Paid ₹80", "To Mr Khuswant Rajpurohit", "18 Sep '26, 09:45 pm"]
+        #expect(ReceiptParser.extractMerchant(from: lines) == "Mr Khuswant Rajpurohit")
+    }
+
     @Test func detectsBillKeywords() {
         #expect(ReceiptParser.detectBill(in: "Electricity Bill Payment\n₹1200") == true)
         #expect(ReceiptParser.detectBill(in: "Paid to Swiggy\n₹450") == false)
