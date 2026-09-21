@@ -12,9 +12,53 @@ struct LedgerContactDetailView: View {
     @State private var editingEntry: LedgerEntry?
     @State private var showingRename = false
     @State private var deletingEntry: LedgerEntry?
+    @State private var searchText = ""
+    @State private var sortOption: EntrySortOption = .dateDescending
+    @State private var directionFilter: EntryDirectionFilter = .all
 
-    private var sortedEntries: [LedgerEntry] {
-        contact.entries.sorted { $0.date > $1.date }
+    private enum EntrySortOption: String, CaseIterable, Identifiable {
+        case dateDescending = "Newest first"
+        case dateAscending = "Oldest first"
+        case amountDescending = "Amount: high to low"
+        case amountAscending = "Amount: low to high"
+
+        var id: String { rawValue }
+    }
+
+    private enum EntryDirectionFilter: String, CaseIterable, Identifiable {
+        case all = "All"
+        case iPaid = "I paid"
+        case theyPaid = "They paid"
+        case settlementsOnly = "Settlements only"
+
+        var id: String { rawValue }
+    }
+
+    private var isFiltering: Bool { directionFilter != .all }
+
+    /// `contact.entries` filtered by search text/direction, then sorted.
+    private var displayedEntries: [LedgerEntry] {
+        var result = contact.entries
+
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty {
+            result = result.filter { $0.note?.localizedCaseInsensitiveContains(query) == true }
+        }
+
+        switch directionFilter {
+        case .all: break
+        case .iPaid: result = result.filter { $0.direction == .iPaid }
+        case .theyPaid: result = result.filter { $0.direction == .theyPaid }
+        case .settlementsOnly: result = result.filter { $0.isSettlement }
+        }
+
+        switch sortOption {
+        case .dateDescending: result.sort { $0.date > $1.date }
+        case .dateAscending: result.sort { $0.date < $1.date }
+        case .amountDescending: result.sort { $0.amount > $1.amount }
+        case .amountAscending: result.sort { $0.amount < $1.amount }
+        }
+        return result
     }
 
     private var state: LedgerEngine.BalanceState {
@@ -38,11 +82,14 @@ struct LedgerContactDetailView: View {
                 .listRowBackground(Color.clear)
 
             Section("History") {
-                if sortedEntries.isEmpty {
+                if contact.entries.isEmpty {
                     Text("No transactions yet.")
                         .foregroundStyle(.secondary)
+                } else if displayedEntries.isEmpty {
+                    Text("No transactions match your search/filters.")
+                        .foregroundStyle(.secondary)
                 }
-                ForEach(sortedEntries) { entry in
+                ForEach(displayedEntries) { entry in
                     EntryRow(entry: entry, currencyCode: currencyCode)
                         .contentShape(Rectangle())
                         .contextMenu {
@@ -62,12 +109,31 @@ struct LedgerContactDetailView: View {
         }
         .navigationTitle(contact.name)
         .compactListLayout()
+        .searchable(text: $searchText, prompt: "Search transactions")
         .toolbar {
             ToolbarItem {
                 Button {
                     showingRename = true
                 } label: {
                     Label("Rename", systemImage: "pencil")
+                }
+            }
+            ToolbarItem {
+                Menu {
+                    Picker("Sort", selection: $sortOption) {
+                        ForEach(EntrySortOption.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                    Picker("Filter", selection: $directionFilter) {
+                        ForEach(EntryDirectionFilter.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                } label: {
+                    Image(systemName: isFiltering
+                        ? "line.3.horizontal.decrease.circle.fill"
+                        : "line.3.horizontal.decrease.circle")
                 }
             }
         }

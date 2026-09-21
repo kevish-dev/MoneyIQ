@@ -17,10 +17,70 @@ struct LedgerView: View {
     @State private var showingAddContact = false
     @State private var renamingContact: LedgerContact?
     @State private var contactsPendingDelete: [LedgerContact]?
+    @State private var searchText = ""
+    @State private var sortOption: ContactSortOption = .recentlyAdded
+    @State private var balanceFilter: BalanceFilter = .all
+
+    private enum ContactSortOption: String, CaseIterable, Identifiable {
+        case recentlyAdded = "Recently added"
+        case nameAscending = "Name: A to Z"
+        case nameDescending = "Name: Z to A"
+        case balanceDescending = "Balance: owed to you first"
+        case balanceAscending = "Balance: you owe first"
+
+        var id: String { rawValue }
+    }
+
+    private enum BalanceFilter: String, CaseIterable, Identifiable {
+        case all = "Everyone"
+        case theyOweYou = "Owes you"
+        case youOweThem = "You owe"
+        case settled = "Settled up"
+
+        var id: String { rawValue }
+    }
 
     private var currencyCode: String {
         authManager.currentAccount?.preferredCurrencyCode ?? "USD"
     }
+
+    /// `contacts` filtered by search text/balance state, then sorted per
+    /// `sortOption`.
+    private var displayedContacts: [LedgerContact] {
+        var result = contacts
+
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty {
+            result = result.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        }
+
+        if balanceFilter != .all {
+            result = result.filter { contact in
+                switch (balanceFilter, LedgerEngine.balanceState(for: contact.entries)) {
+                case (.theyOweYou, .theyOweYou): true
+                case (.youOweThem, .youOweThem): true
+                case (.settled, .settled): true
+                default: false
+                }
+            }
+        }
+
+        switch sortOption {
+        case .recentlyAdded:
+            result.sort { $0.createdAt > $1.createdAt }
+        case .nameAscending:
+            result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .nameDescending:
+            result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
+        case .balanceDescending:
+            result.sort { LedgerEngine.netBalance(for: $0.entries) > LedgerEngine.netBalance(for: $1.entries) }
+        case .balanceAscending:
+            result.sort { LedgerEngine.netBalance(for: $0.entries) < LedgerEngine.netBalance(for: $1.entries) }
+        }
+        return result
+    }
+
+    private var isFiltering: Bool { balanceFilter != .all }
 
     private var overallSummary: (owedToYou: Decimal, youOwe: Decimal) {
         var owedToYou = Decimal(0)
@@ -53,7 +113,11 @@ struct LedgerView: View {
                         .listRowBackground(Color.clear)
 
                     Section("People") {
-                        ForEach(contacts) { contact in
+                        if displayedContacts.isEmpty {
+                            Text("No one matches your search/filters.")
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(displayedContacts) { contact in
                             NavigationLink {
                                 LedgerContactDetailView(contact: contact, currencyCode: currencyCode)
                             } label: {
@@ -73,16 +137,35 @@ struct LedgerView: View {
                             }
                         }
                         .onDelete { offsets in
-                            contactsPendingDelete = offsets.map { contacts[$0] }
+                            contactsPendingDelete = offsets.map { displayedContacts[$0] }
                         }
                     }
                 }
             }
             .navigationTitle("Split")
             .compactListLayout()
+            .searchable(text: $searchText, prompt: "Search people")
             .toolbar {
                 ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
                     ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
+                }
+                ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
+                    Menu {
+                        Picker("Sort", selection: $sortOption) {
+                            ForEach(ContactSortOption.allCases) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+                        Picker("Filter", selection: $balanceFilter) {
+                            ForEach(BalanceFilter.allCases) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: isFiltering
+                            ? "line.3.horizontal.decrease.circle.fill"
+                            : "line.3.horizontal.decrease.circle")
+                    }
                 }
                 ToolbarItem {
                     Button {
