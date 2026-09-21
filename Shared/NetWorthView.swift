@@ -22,61 +22,59 @@ struct NetWorthView: View {
     private var liabilities: [NetWorthAccount] { accounts.filter { $0.kind == .liability } }
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Net Worth")
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.8))
-                        Text(netWorth, format: .currency(code: currencyCode))
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(AppTheme.Spacing.large)
-                    .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                    .padding(.vertical, AppTheme.Spacing.small)
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Net Worth")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.8))
+                    Text(netWorth, format: .currency(code: currencyCode))
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(AppTheme.Spacing.large)
+                .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .padding(.vertical, AppTheme.Spacing.small)
+            }
 
-                if !assets.isEmpty {
-                    Section("Assets") {
-                        ForEach(assets) { account in
-                            accountRow(account)
-                        }
-                        .onDelete { delete(assets, at: $0) }
+            if !assets.isEmpty {
+                Section("Assets") {
+                    ForEach(assets) { account in
+                        accountRow(account)
                     }
-                }
-
-                if !liabilities.isEmpty {
-                    Section("Liabilities") {
-                        ForEach(liabilities) { account in
-                            accountRow(account)
-                        }
-                        .onDelete { delete(liabilities, at: $0) }
-                    }
-                }
-
-                if accounts.isEmpty {
-                    ContentUnavailableIfNeeded()
+                    .onDelete { delete(assets, at: $0) }
                 }
             }
-            .navigationTitle("Net Worth")
-            .compactListLayout()
-            .toolbar {
-                ToolbarItem {
-                    Button {
-                        showingAddAccount = true
-                    } label: {
-                        Label("Add Account", systemImage: "plus")
+
+            if !liabilities.isEmpty {
+                Section("Liabilities") {
+                    ForEach(liabilities) { account in
+                        accountRow(account)
                     }
+                    .onDelete { delete(liabilities, at: $0) }
                 }
             }
-            .sheet(isPresented: $showingAddAccount) {
-                AddNetWorthAccountView()
+
+            if accounts.isEmpty {
+                ContentUnavailableIfNeeded()
             }
+        }
+        .navigationTitle("Net Worth")
+        .compactListLayout()
+        .toolbar {
+            ToolbarItem {
+                Button {
+                    showingAddAccount = true
+                } label: {
+                    Label("Add Account", systemImage: "plus")
+                }
+            }
+        }
+        .sheet(isPresented: $showingAddAccount) {
+            AddNetWorthAccountView()
         }
     }
 

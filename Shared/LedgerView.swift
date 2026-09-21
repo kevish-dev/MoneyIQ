@@ -7,6 +7,9 @@ import MoneyIQCore
 /// moves between you and someone else, not your own spending.
 struct LedgerView: View {
     let authManager: AuthManager
+    let settings: AppSettingsStore
+    let notifications: NotificationScheduler
+    let lockManager: AppLockManager
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \LedgerContact.createdAt, order: .reverse) private var contacts: [LedgerContact]
@@ -62,6 +65,9 @@ struct LedgerView: View {
             .navigationTitle("Split")
             .compactListLayout()
             .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
+                }
                 ToolbarItem {
                     Button {
                         showingAddContact = true

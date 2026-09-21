@@ -14,11 +14,18 @@ public struct BudgetActivityAttributes: ActivityAttributes {
         public var spent: Decimal
         public var cap: Decimal
         public var currencyCode: String
+        /// Independently toggleable per surface (Settings → Live Activity) —
+        /// one running Activity backs both, but the widget extension checks
+        /// these to decide what, if anything, to render on each.
+        public var showOnLockScreen: Bool
+        public var showOnDynamicIsland: Bool
 
-        public init(spent: Decimal, cap: Decimal, currencyCode: String) {
+        public init(spent: Decimal, cap: Decimal, currencyCode: String, showOnLockScreen: Bool = true, showOnDynamicIsland: Bool = true) {
             self.spent = spent
             self.cap = cap
             self.currencyCode = currencyCode
+            self.showOnLockScreen = showOnLockScreen
+            self.showOnDynamicIsland = showOnDynamicIsland
         }
 
         public var remaining: Decimal { cap - spent }

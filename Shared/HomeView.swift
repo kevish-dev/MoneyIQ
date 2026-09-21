@@ -5,6 +5,8 @@ import MoneyIQCore
 struct HomeView: View {
     let authManager: AuthManager
     let settings: AppSettingsStore
+    let notifications: NotificationScheduler
+    let lockManager: AppLockManager
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \ExpenseTransaction.date, order: .reverse) private var transactions: [ExpenseTransaction]
@@ -112,6 +114,11 @@ struct HomeView: View {
             // entry point for starting a new transaction: the "Add Expense"
             // button on the budget card, which itself presents the same
             // "Enter Manually" / "From Screenshot" choice as a menu.
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
+                }
+            }
             .sheet(item: $editingTransaction) { transaction in
                 EditTransactionView(transaction: transaction, categories: categories)
             }
@@ -139,13 +146,17 @@ struct HomeView: View {
                     await liveActivityManager.update(
                         spent: progress.spent,
                         cap: progress.effectiveCap,
-                        currencyCode: account.preferredCurrencyCode
+                        currencyCode: account.preferredCurrencyCode,
+                        showOnLockScreen: settings.isBudgetLockScreenEnabled,
+                        showOnDynamicIsland: settings.isBudgetDynamicIslandEnabled
                     )
                 } else {
                     liveActivityManager.start(
                         spent: progress.spent,
                         cap: progress.effectiveCap,
-                        currencyCode: account.preferredCurrencyCode
+                        currencyCode: account.preferredCurrencyCode,
+                        showOnLockScreen: settings.isBudgetLockScreenEnabled,
+                        showOnDynamicIsland: settings.isBudgetDynamicIslandEnabled
                     )
                 }
             }
@@ -155,7 +166,7 @@ struct HomeView: View {
 
     #if os(iOS)
     private var liveActivitySyncKey: String {
-        "\(settings.isBudgetLiveActivityEnabled)-\(budgets.first?.id.uuidString ?? "none")-\(transactions.count)"
+        "\(settings.isBudgetLockScreenEnabled)-\(settings.isBudgetDynamicIslandEnabled)-\(budgets.first?.id.uuidString ?? "none")-\(transactions.count)"
     }
     #endif
 

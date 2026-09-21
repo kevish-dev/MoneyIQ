@@ -13,7 +13,8 @@ public final class AppSettingsStore {
         static let weeklySummaryEnabled = "com.moneyiq.settings.weeklySummaryEnabled"
         static let weeklySummaryWeekday = "com.moneyiq.settings.weeklySummaryWeekday"
         static let weeklySummaryMinutesSinceMidnight = "com.moneyiq.settings.weeklySummaryMinutes"
-        static let budgetLiveActivityEnabled = "com.moneyiq.settings.budgetLiveActivityEnabled"
+        static let budgetLockScreenEnabled = "com.moneyiq.settings.budgetLockScreenEnabled"
+        static let budgetDynamicIslandEnabled = "com.moneyiq.settings.budgetDynamicIslandEnabled"
     }
 
     private let defaults: UserDefaults
@@ -51,10 +52,27 @@ public final class AppSettingsStore {
         }
     }
 
-    /// Off by default — showing budget status on the Lock Screen / Dynamic
-    /// Island is opt-in, not automatic just because a budget exists.
+    /// Off by default — showing budget status on the Lock Screen is opt-in,
+    /// not automatic just because a budget exists. Independent from the
+    /// Dynamic Island toggle below: one Live Activity backs both surfaces,
+    /// but each can be shown/hidden on its own (see
+    /// `BudgetActivityAttributes.ContentState`'s `showOnLockScreen`/
+    /// `showOnDynamicIsland`, which the widget extension reads to decide
+    /// what to render on each surface).
+    public var isBudgetLockScreenEnabled: Bool {
+        didSet { defaults.set(isBudgetLockScreenEnabled, forKey: Key.budgetLockScreenEnabled) }
+    }
+
+    /// Off by default — see `isBudgetLockScreenEnabled`.
+    public var isBudgetDynamicIslandEnabled: Bool {
+        didSet { defaults.set(isBudgetDynamicIslandEnabled, forKey: Key.budgetDynamicIslandEnabled) }
+    }
+
+    /// Whether the Live Activity should be running at all — true if either
+    /// surface wants it. The activity itself is one instance shared by both
+    /// surfaces; per-surface content visibility is a separate concern.
     public var isBudgetLiveActivityEnabled: Bool {
-        didSet { defaults.set(isBudgetLiveActivityEnabled, forKey: Key.budgetLiveActivityEnabled) }
+        isBudgetLockScreenEnabled || isBudgetDynamicIslandEnabled
     }
 
     public init(defaults: UserDefaults = .standard) {
@@ -62,7 +80,8 @@ public final class AppSettingsStore {
         self.isAppLockEnabled = defaults.bool(forKey: Key.appLockEnabled)
         self.isDailyReminderEnabled = defaults.bool(forKey: Key.dailyReminderEnabled)
         self.isWeeklySummaryEnabled = defaults.bool(forKey: Key.weeklySummaryEnabled)
-        self.isBudgetLiveActivityEnabled = defaults.bool(forKey: Key.budgetLiveActivityEnabled)
+        self.isBudgetLockScreenEnabled = defaults.bool(forKey: Key.budgetLockScreenEnabled)
+        self.isBudgetDynamicIslandEnabled = defaults.bool(forKey: Key.budgetDynamicIslandEnabled)
 
         let dailyMinutes = defaults.object(forKey: Key.dailyReminderMinutesSinceMidnight) as? Int ?? (20 * 60)
         self.dailyReminderTime = DateComponents(hour: dailyMinutes / 60, minute: dailyMinutes % 60)

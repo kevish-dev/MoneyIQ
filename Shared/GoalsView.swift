@@ -4,6 +4,9 @@ import MoneyIQCore
 
 struct GoalsView: View {
     let authManager: AuthManager
+    let settings: AppSettingsStore
+    let notifications: NotificationScheduler
+    let lockManager: AppLockManager
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \SavingsGoal.targetDate) private var goals: [SavingsGoal]
@@ -33,6 +36,9 @@ struct GoalsView: View {
             .navigationTitle("Goals")
             .compactListLayout()
             .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
+                }
                 ToolbarItem {
                     Button {
                         showingAddGoal = true

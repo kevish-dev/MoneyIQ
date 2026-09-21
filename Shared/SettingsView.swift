@@ -17,30 +17,28 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                securitySection
-                notificationsSection
-                accountSection
-            }
-            .navigationTitle("Settings")
-            .compactFormLayout()
-            .alert(
-                "Notifications are off",
-                isPresented: Binding(
-                    get: { notificationDeniedAlertKind != nil },
-                    set: { if !$0 { notificationDeniedAlertKind = nil } }
-                )
-            ) {
-                Button("Open Settings") { openSystemNotificationSettings() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Turn on notifications for MoneyIQ in Settings to enable reminders.")
-            }
-            .task {
-                if settings.isWeeklySummaryEnabled {
-                    rescheduleWeeklySummary()
-                }
+        Form {
+            securitySection
+            notificationsSection
+            accountSection
+        }
+        .navigationTitle("Settings")
+        .compactFormLayout()
+        .alert(
+            "Notifications are off",
+            isPresented: Binding(
+                get: { notificationDeniedAlertKind != nil },
+                set: { if !$0 { notificationDeniedAlertKind = nil } }
+            )
+        ) {
+            Button("Open Settings") { openSystemNotificationSettings() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Turn on notifications for MoneyIQ in Settings to enable reminders.")
+        }
+        .task {
+            if settings.isWeeklySummaryEnabled {
+                rescheduleWeeklySummary()
             }
         }
     }
@@ -93,10 +91,6 @@ struct SettingsView: View {
             } label: {
                 Label("Custom Payment Reminders", systemImage: "bell.badge")
             }
-
-            #if os(iOS)
-            Toggle("Show budget on Lock Screen & Dynamic Island", isOn: $settings.isBudgetLiveActivityEnabled)
-            #endif
         } header: {
             Text("Notifications")
         } footer: {
@@ -229,10 +223,12 @@ import AppKit
 #Preview {
     let container = PersistenceController.makeContainer(inMemory: true)
     let settings = AppSettingsStore()
-    SettingsView(
-        authManager: AuthManager(modelContext: container.mainContext),
-        settings: settings,
-        notifications: NotificationScheduler(),
-        lockManager: AppLockManager(settings: settings)
-    )
+    NavigationStack {
+        SettingsView(
+            authManager: AuthManager(modelContext: container.mainContext),
+            settings: settings,
+            notifications: NotificationScheduler(),
+            lockManager: AppLockManager(settings: settings)
+        )
+    }
 }

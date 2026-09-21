@@ -8,24 +8,25 @@ struct MainTabView: View {
     let lockManager: AppLockManager
 
     var body: some View {
+        // Net Worth and Settings deliberately aren't tabs — they're visited
+        // far less often than the 5 below, so they live behind the profile
+        // icon (top-left of each tab, App Store-style) instead. "More" is
+        // gone; its slot is now the Live Activity customization screen.
         TabView {
             Tab("Home", systemImage: "house.fill") {
-                HomeView(authManager: authManager, settings: settings)
+                HomeView(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
             }
             Tab("Split", systemImage: "person.2.fill") {
-                LedgerView(authManager: authManager)
+                LedgerView(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
             }
             Tab("Insights", systemImage: "chart.line.uptrend.xyaxis") {
-                InsightsView(authManager: authManager)
+                InsightsView(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
             }
             Tab("Goals", systemImage: "target") {
-                GoalsView(authManager: authManager)
+                GoalsView(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
             }
-            Tab("Net Worth", systemImage: "chart.pie.fill") {
-                NetWorthView(authManager: authManager)
-            }
-            Tab("Settings", systemImage: "gearshape.fill") {
-                SettingsView(
+            Tab("Live Activity", systemImage: "lock.display") {
+                LiveActivitySettingsView(
                     authManager: authManager,
                     settings: settings,
                     notifications: notifications,

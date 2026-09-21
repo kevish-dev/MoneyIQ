@@ -5,6 +5,9 @@ import MoneyIQCore
 
 struct InsightsView: View {
     let authManager: AuthManager
+    let settings: AppSettingsStore
+    let notifications: NotificationScheduler
+    let lockManager: AppLockManager
 
     @Query(sort: \ExpenseTransaction.date) private var transactions: [ExpenseTransaction]
 
@@ -81,6 +84,11 @@ struct InsightsView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
+                }
+            }
         }
     }
 
