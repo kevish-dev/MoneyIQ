@@ -151,4 +151,56 @@ struct InsightsEngineTests {
         #expect(daily.first?.total == 25)
         #expect(daily.last?.total == 50) // 40 + 10 on the 15th
     }
+
+    @Test func dailySpendForPastMonthCoversTheWholeMonth() {
+        let calendar = Calendar.current
+        let now = calendar.date(from: DateComponents(year: 2024, month: 6, day: 15))!
+        let mayFirst = calendar.date(from: DateComponents(year: 2024, month: 5, day: 1))!
+
+        let transactions = [ExpenseTransaction(amount: 100, date: mayFirst)]
+        let daily = InsightsEngine.dailySpend(transactions: transactions, forMonthContaining: mayFirst, calendar: calendar, now: now)
+        #expect(daily.count == 31) // all of May, not just up to "now"
+        #expect(daily.first?.total == 100)
+    }
+
+    @Test func monthOverMonthChangeComputesPercentDelta() {
+        let calendar = Calendar.current
+        let june = calendar.date(from: DateComponents(year: 2024, month: 6, day: 15))!
+        let mayFirst = calendar.date(from: DateComponents(year: 2024, month: 5, day: 1))!
+
+        let transactions = [
+            ExpenseTransaction(amount: 100, date: mayFirst),
+            ExpenseTransaction(amount: 150, date: june)
+        ]
+        let change = InsightsEngine.monthOverMonthChange(transactions: transactions, forMonthContaining: june, calendar: calendar)
+        #expect(change.currentTotal == 150)
+        #expect(change.previousTotal == 100)
+        #expect(change.percentChange == 0.5)
+    }
+
+    @Test func monthOverMonthChangeIsNilPercentWhenPreviousMonthWasZero() {
+        let calendar = Calendar.current
+        let june = calendar.date(from: DateComponents(year: 2024, month: 6, day: 15))!
+        let change = InsightsEngine.monthOverMonthChange(
+            transactions: [ExpenseTransaction(amount: 50, date: june)],
+            forMonthContaining: june,
+            calendar: calendar
+        )
+        #expect(change.percentChange == nil)
+    }
+
+    @Test func topMerchantsSortsByTotalDescending() {
+        let calendar = Calendar.current
+        let june = calendar.date(from: DateComponents(year: 2024, month: 6, day: 10))!
+
+        let transactions = [
+            ExpenseTransaction(amount: 20, date: june, merchantName: "Swiggy"),
+            ExpenseTransaction(amount: 30, date: june, merchantName: "Swiggy"),
+            ExpenseTransaction(amount: 45, date: june, merchantName: "Amazon")
+        ]
+        let top = InsightsEngine.topMerchants(transactions: transactions, forMonthContaining: june, calendar: calendar)
+        #expect(top.first?.merchantName == "Swiggy")
+        #expect(top.first?.total == 50)
+        #expect(top.first?.occurrences == 2)
+    }
 }

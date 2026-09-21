@@ -15,6 +15,8 @@ public final class AppSettingsStore {
         static let weeklySummaryMinutesSinceMidnight = "com.moneyiq.settings.weeklySummaryMinutes"
         static let budgetLockScreenEnabled = "com.moneyiq.settings.budgetLockScreenEnabled"
         static let budgetDynamicIslandEnabled = "com.moneyiq.settings.budgetDynamicIslandEnabled"
+        static let lockScreenContentKind = "com.moneyiq.settings.lockScreenContentKind"
+        static let dynamicIslandContentKind = "com.moneyiq.settings.dynamicIslandContentKind"
     }
 
     private let defaults: UserDefaults
@@ -68,6 +70,17 @@ public final class AppSettingsStore {
         didSet { defaults.set(isBudgetDynamicIslandEnabled, forKey: Key.budgetDynamicIslandEnabled) }
     }
 
+    /// What the Lock Screen shows when `isBudgetLockScreenEnabled` is on —
+    /// independent from the Dynamic Island's own choice below.
+    public var lockScreenContentKind: LiveActivityContentKind {
+        didSet { defaults.set(lockScreenContentKind.rawValue, forKey: Key.lockScreenContentKind) }
+    }
+
+    /// What the Dynamic Island shows when `isBudgetDynamicIslandEnabled` is on.
+    public var dynamicIslandContentKind: LiveActivityContentKind {
+        didSet { defaults.set(dynamicIslandContentKind.rawValue, forKey: Key.dynamicIslandContentKind) }
+    }
+
     /// Whether the Live Activity should be running at all — true if either
     /// surface wants it. The activity itself is one instance shared by both
     /// surfaces; per-surface content visibility is a separate concern.
@@ -82,6 +95,8 @@ public final class AppSettingsStore {
         self.isWeeklySummaryEnabled = defaults.bool(forKey: Key.weeklySummaryEnabled)
         self.isBudgetLockScreenEnabled = defaults.bool(forKey: Key.budgetLockScreenEnabled)
         self.isBudgetDynamicIslandEnabled = defaults.bool(forKey: Key.budgetDynamicIslandEnabled)
+        self.lockScreenContentKind = (defaults.string(forKey: Key.lockScreenContentKind)).flatMap(LiveActivityContentKind.init) ?? .budgetProgress
+        self.dynamicIslandContentKind = (defaults.string(forKey: Key.dynamicIslandContentKind)).flatMap(LiveActivityContentKind.init) ?? .budgetProgress
 
         let dailyMinutes = defaults.object(forKey: Key.dailyReminderMinutesSinceMidnight) as? Int ?? (20 * 60)
         self.dailyReminderTime = DateComponents(hour: dailyMinutes / 60, minute: dailyMinutes % 60)

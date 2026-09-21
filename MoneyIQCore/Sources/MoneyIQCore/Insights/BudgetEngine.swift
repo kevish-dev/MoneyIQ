@@ -58,4 +58,22 @@ public enum BudgetEngine {
             rolloverFromLastMonth: rollover
         )
     }
+
+    /// How much you could spend per remaining day this month and still land
+    /// exactly on your cap — the "Daily Pace" Live Activity content type.
+    /// Days remaining includes today, floored at 1 so the last day of the
+    /// month doesn't divide by zero.
+    public struct DailyPace: Sendable {
+        public let recommendedDailySpend: Decimal
+        public let daysRemaining: Int
+    }
+
+    public static func dailyPace(remaining: Decimal, asOf date: Date = .now, calendar: Calendar = .current) -> DailyPace {
+        let monthStart = calendar.startOfMonth(for: date)
+        guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else {
+            return DailyPace(recommendedDailySpend: max(0, remaining), daysRemaining: 1)
+        }
+        let daysRemaining = max(1, calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: monthEnd).day ?? 1)
+        return DailyPace(recommendedDailySpend: max(0, remaining) / Decimal(daysRemaining), daysRemaining: daysRemaining)
+    }
 }

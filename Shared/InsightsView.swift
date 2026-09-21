@@ -11,48 +11,62 @@ struct InsightsView: View {
 
     @Query(sort: \ExpenseTransaction.date) private var transactions: [ExpenseTransaction]
 
+    /// The month currently being viewed — defaults to the current month,
+    /// but every section below re-derives from this instead of `.now`, so
+    /// navigating to a past month re-slices the whole screen for it.
+    @State private var selectedMonth: Date = Calendar.current.startOfMonth(for: .now)
+
+    private var calendar: Calendar { .current }
+
     private var currencyCode: String {
         authManager.currentAccount?.preferredCurrencyCode ?? "USD"
     }
+
+    private var isCurrentMonth: Bool {
+        calendar.startOfMonth(for: selectedMonth) == calendar.startOfMonth(for: .now)
+    }
+
+    private var canGoToNextMonth: Bool { !isCurrentMonth }
 
     private var monthlyTotals: [InsightsEngine.MonthlyTotal] {
         InsightsEngine.monthlyTotals(transactions: transactions)
     }
 
-    private var categoryBreakdown: [InsightsEngine.CategoryTotal] {
-        InsightsEngine.categoryBreakdown(transactions: transactions)
-    }
-
     private var categoryShares: [InsightsEngine.CategoryShare] {
-        InsightsEngine.categoryShares(transactions: transactions)
+        InsightsEngine.categoryShares(transactions: transactions, forMonthContaining: selectedMonth)
     }
 
     private var dailySpend: [InsightsEngine.DailySpend] {
-        InsightsEngine.dailySpendThisMonth(transactions: transactions)
+        InsightsEngine.dailySpend(transactions: transactions, forMonthContaining: selectedMonth)
     }
 
     private var monthTotalSpend: Decimal {
-        categoryBreakdown.reduce(Decimal(0)) { $0 + $1.total }
+        categoryShares.reduce(Decimal(0)) { $0 + $1.total }
     }
 
-    /// Percent change vs. the prior month, for the hero card's pill —
-    /// derived from the existing `monthlyTotals` bucketing rather than a
-    /// new engine function, since the two already-adjacent months it needs
-    /// are already in that array.
-    private var monthOverMonthChange: Double? {
-        guard monthlyTotals.count >= 2 else { return nil }
-        let current = monthlyTotals[monthlyTotals.count - 1].total
-        let previous = monthlyTotals[monthlyTotals.count - 2].total
-        guard previous > 0 else { return nil }
-        return NSDecimalNumber(decimal: (current - previous) / previous).doubleValue
+    private var monthChange: InsightsEngine.MonthOverMonthChange {
+        InsightsEngine.monthOverMonthChange(transactions: transactions, forMonthContaining: selectedMonth)
     }
 
+    private var topMerchants: [InsightsEngine.MerchantTotal] {
+        InsightsEngine.topMerchants(transactions: transactions, forMonthContaining: selectedMonth)
+    }
+
+    /// Anomalies use ALL transactions for the per-category average (better
+    /// statistics from more history), but only the ones that actually fall
+    /// in the viewed month are shown.
     private var anomalies: [InsightsEngine.Anomaly] {
-        InsightsEngine.anomalies(in: transactions)
+        let monthStart = calendar.startOfMonth(for: selectedMonth)
+        guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return [] }
+        return InsightsEngine.anomalies(in: transactions)
+            .filter { $0.transaction.date >= monthStart && $0.transaction.date < monthEnd }
     }
 
+    /// "Next expected" only makes sense looking forward, so this only shows
+    /// while viewing the current month.
     private var subscriptions: [InsightsEngine.SubscriptionCandidate] {
-        InsightsEngine.recurringSubscriptions(in: transactions)
+        guard isCurrentMonth else { return [] }
+        return InsightsEngine.recurringSubscriptions(in: transactions)
     }
 
     private var forecast: InsightsEngine.CashFlowForecast {
@@ -66,12 +80,19 @@ struct InsightsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
+                    monthNavigator
                     if transactions.isEmpty {
                         emptyState
                     } else {
                         spendChartHeroCard
-                        cashFlowCard
+                        if isCurrentMonth {
+                            cashFlowCard
+                        } else {
+                            monthSummaryCard
+                        }
+                        trendSection
                         categoryBubbleSection
+                        if !topMerchants.isEmpty { topMerchantsSection }
                         if !anomalies.isEmpty { anomalySection }
                         if !subscriptions.isEmpty { subscriptionSection }
                     }
@@ -90,6 +111,42 @@ struct InsightsView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Month navigation
+
+    private var monthNavigator: some View {
+        HStack {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
+                }
+            } label: {
+                Image(systemName: "chevron.left.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(AppTheme.accent)
+            }
+
+            Spacer()
+
+            Text(selectedMonth, format: .dateTime.month(.wide).year())
+                .font(.headline)
+
+            Spacer()
+
+            Button {
+                guard canGoToNextMonth else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
+                }
+            } label: {
+                Image(systemName: "chevron.right.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(canGoToNextMonth ? AppTheme.accent : Color.secondary.opacity(0.3))
+            }
+            .disabled(!canGoToNextMonth)
+        }
+        .padding(.top, AppTheme.Spacing.xs)
     }
 
     private var emptyState: some View {
@@ -148,20 +205,46 @@ struct InsightsView: View {
         }
     }
 
-    /// Dark orange/red hero card with the current month's total spend and
+    /// Shown instead of `cashFlowCard` for a past month, where a forward
+    /// "projected balance" doesn't make sense — a simple recap instead.
+    private var monthSummaryCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Month Summary")
+                .font(.headline)
+            HStack {
+                forecastStat("Total spent", monthChange.currentTotal)
+                Spacer()
+                if let percent = monthChange.percentChange {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("vs. previous month").font(.caption).foregroundStyle(.secondary)
+                        Label(
+                            percent.formatted(.percent.precision(.fractionLength(1))),
+                            systemImage: percent >= 0 ? "arrow.up.right" : "arrow.down.right"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(percent >= 0 ? .red : .green)
+                    }
+                }
+            }
+        }
+        .padding(AppTheme.Spacing.large)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    /// Dark orange/red hero card with the selected month's total spend and
     /// the interactive scrub/hover line chart — matches the design
     /// reference's balance-card-plus-chart pattern (image 4).
     private var spendChartHeroCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Spent This Month")
+                Text(isCurrentMonth ? "Spent This Month" : "Spent That Month")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.8))
                 Spacer()
-                if let change = monthOverMonthChange {
+                if let percent = monthChange.percentChange {
                     Label(
-                        change.formatted(.percent.precision(.fractionLength(1))),
-                        systemImage: change >= 0 ? "arrow.up.right" : "arrow.down.right"
+                        percent.formatted(.percent.precision(.fractionLength(1))),
+                        systemImage: percent >= 0 ? "arrow.up.right" : "arrow.down.right"
                     )
                     .font(.caption2.weight(.semibold))
                     .padding(.horizontal, 10)
@@ -176,7 +259,7 @@ struct InsightsView: View {
                 .foregroundStyle(.white)
 
             if dailySpend.isEmpty {
-                Text("No spending yet this month.")
+                Text("No spending that month.")
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.7))
                     .frame(height: 140)
@@ -191,15 +274,63 @@ struct InsightsView: View {
         .shadow(color: AppTheme.emberRed.opacity(0.3), radius: 16, y: 10)
     }
 
+    /// A trailing-6-month bar chart — tap any bar to jump `selectedMonth`
+    /// there, so the month-by-month trend and the detailed per-month
+    /// sections above stay connected instead of being two separate views.
+    private var trendSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("6-Month Trend")
+                .font(.headline)
+            Chart(monthlyTotals) { bucket in
+                BarMark(
+                    x: .value("Month", bucket.monthStart, unit: .month),
+                    y: .value("Spend", NSDecimalNumber(decimal: bucket.total).doubleValue)
+                )
+                .foregroundStyle(
+                    calendar.isDate(bucket.monthStart, equalTo: selectedMonth, toGranularity: .month)
+                        ? AppTheme.accent
+                        : AppTheme.accent.opacity(0.35)
+                )
+                .cornerRadius(4)
+            }
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .month)) { value in
+                    AxisValueLabel(format: .dateTime.month(.abbreviated))
+                }
+            }
+            .chartYAxis(.hidden)
+            .frame(height: 120)
+            .chartOverlay { proxy in
+                GeometryReader { geometry in
+                    Rectangle()
+                        .fill(.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture { location in
+                            let origin = geometry[proxy.plotAreaFrame].origin
+                            guard let date: Date = proxy.value(atX: location.x - origin.x) else { return }
+                            guard let closest = monthlyTotals.min(by: {
+                                abs($0.monthStart.timeIntervalSince(date)) < abs($1.monthStart.timeIntervalSince(date))
+                            }) else { return }
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedMonth = calendar.startOfMonth(for: closest.monthStart)
+                            }
+                        }
+                }
+            }
+        }
+        .padding(AppTheme.Spacing.large)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
+    }
+
     /// The category bubble chart, plus a compact "top categories" stat row
     /// beneath it — the design reference's expense-breakdown screen
     /// (image 3), reskinned in the app's orange palette.
     private var categoryBubbleSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("This Month by Category")
+            Text("By Category")
                 .font(.headline)
             if categoryShares.isEmpty {
-                Text("No spending yet this month.")
+                Text("No spending that month.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
@@ -242,6 +373,28 @@ struct InsightsView: View {
         }
         .padding(AppTheme.Spacing.large)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
+    }
+
+    private var topMerchantsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Top Merchants")
+                .font(.headline)
+            ForEach(topMerchants) { merchant in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(merchant.merchantName).font(.subheadline.weight(.medium))
+                        Text("\(merchant.occurrences) transaction\(merchant.occurrences == 1 ? "" : "s")")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(merchant.total, format: .currency(code: currencyCode))
+                        .font(.subheadline.weight(.semibold))
+                }
+                .padding(12)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
     }
 
     private var anomalySection: some View {

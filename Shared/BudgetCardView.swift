@@ -7,6 +7,11 @@ import MoneyIQCore
 /// for it despite having the data model.
 struct BudgetCardView: View {
     let currencyCode: String
+    /// When true, the gradient extends behind the status bar/Dynamic Island
+    /// (only the bottom corners stay rounded) instead of being a normal
+    /// inset card — Home's top-of-screen placement wants this; other
+    /// reuses (previews, etc.) default to the regular inset card.
+    var fullBleedTop: Bool = false
     /// Both are optional so previews/tests that don't need the sheet
     /// wiring can omit them, but Home passes both — this button is the
     /// single entry point for starting a new transaction (the old toolbar
@@ -44,7 +49,7 @@ struct BudgetCardView: View {
                         .frame(maxWidth: .infinity)
                         .padding(AppTheme.Spacing.large)
                         .foregroundStyle(.white)
-                        .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
+                        .modifier(HeroBleedModifier(fullBleedTop: fullBleedTop, shape: heroShape))
                 }
                 .buttonStyle(.plain)
             }
@@ -104,8 +109,20 @@ struct BudgetCardView: View {
         }
         .padding(AppTheme.Spacing.large)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
+        .modifier(HeroBleedModifier(fullBleedTop: fullBleedTop, shape: heroShape))
         .shadow(color: AppTheme.emberRed.opacity(0.3), radius: 16, y: 10)
+    }
+
+    private var heroShape: AnyShape {
+        fullBleedTop
+            ? AnyShape(UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: AppTheme.cardCornerRadius,
+                bottomTrailingRadius: AppTheme.cardCornerRadius,
+                topTrailingRadius: 0,
+                style: .continuous
+              ))
+            : AnyShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
     }
 
     private var quickActions: some View {
@@ -233,5 +250,34 @@ private struct BudgetEditView: View {
             print("MoneyIQ: failed to delete budget: \(error)")
         }
         dismiss()
+    }
+}
+
+/// Applies the gradient + shape, and — when `fullBleedTop` — extends that
+/// background behind the status bar/Dynamic Island while padding the
+/// content down by exactly the safe area's own height first, so nothing
+/// visually sits under the notch. `.safeAreaPadding` + `.ignoresSafeArea`
+/// on the whole (now-padded) view, in that order, is the documented
+/// pattern for "background bleeds into the safe area, content doesn't."
+private struct HeroBleedModifier: ViewModifier {
+    let fullBleedTop: Bool
+    let shape: AnyShape
+
+    func body(content: Content) -> some View {
+        if fullBleedTop {
+            content
+                .safeAreaPadding(.top)
+                // Clears the profile/filter icon row floating on top of the
+                // card (see HomeView.topBar) — that row isn't part of this
+                // content, so its height has to be accounted for separately.
+                .padding(.top, 44)
+                .background(AppTheme.heroGradient)
+                .clipShape(shape)
+                .ignoresSafeArea(edges: .top)
+        } else {
+            content
+                .background(AppTheme.heroGradient)
+                .clipShape(shape)
+        }
     }
 }

@@ -56,6 +56,19 @@ struct BudgetEngineTests {
         let spent = BudgetEngine.totalSpent(transactions: [thisMonth, lastMonth], inMonthContaining: now)
         #expect(spent == 100)
     }
+
+    @Test func dailyPaceDividesRemainingByDaysLeftIncludingToday() {
+        let date = calendar.date(from: DateComponents(year: 2024, month: 6, day: 25))! // 6 days left: 25-30
+        let pace = BudgetEngine.dailyPace(remaining: 600, asOf: date, calendar: calendar)
+        #expect(pace.daysRemaining == 6)
+        #expect(pace.recommendedDailySpend == 100)
+    }
+
+    @Test func dailyPaceClampsNegativeRemainingToZero() {
+        let date = calendar.date(from: DateComponents(year: 2024, month: 6, day: 25))!
+        let pace = BudgetEngine.dailyPace(remaining: -50, asOf: date, calendar: calendar)
+        #expect(pace.recommendedDailySpend == 0)
+    }
 }
 
 @MainActor

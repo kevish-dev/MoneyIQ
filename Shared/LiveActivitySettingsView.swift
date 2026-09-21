@@ -20,13 +20,26 @@ struct LiveActivitySettingsView: View {
                     Toggle(isOn: $settings.isBudgetLockScreenEnabled) {
                         Label("Lock Screen", systemImage: "lock.fill")
                     }
+                    if settings.isBudgetLockScreenEnabled {
+                        contentKindPicker(selection: $settings.lockScreenContentKind)
+                    }
+                } header: {
+                    Text("Lock Screen")
+                } footer: {
+                    Text("Choose what shows on your Lock Screen while a Live Activity is running.")
+                }
+
+                Section {
                     Toggle(isOn: $settings.isBudgetDynamicIslandEnabled) {
                         Label("Dynamic Island", systemImage: "capsule.inset.filled")
                     }
+                    if settings.isBudgetDynamicIslandEnabled {
+                        contentKindPicker(selection: $settings.dynamicIslandContentKind)
+                    }
                 } header: {
-                    Text("Budget status")
+                    Text("Dynamic Island")
                 } footer: {
-                    Text("Show your remaining monthly budget and spend progress. Each surface is independent — turn on just the one you want.")
+                    Text("Independent from the Lock Screen — pick different content for each, or the same one.")
                 }
 
                 if settings.isBudgetLockScreenEnabled || settings.isBudgetDynamicIslandEnabled {
@@ -58,16 +71,32 @@ struct LiveActivitySettingsView: View {
     }
 
     #if os(iOS)
+    private func contentKindPicker(selection: Binding<LiveActivityContentKind>) -> some View {
+        Picker("Shows", selection: selection) {
+            ForEach(LiveActivityContentKind.allCases, id: \.self) { kind in
+                Label(kind.displayName, systemImage: kind.systemIconName).tag(kind)
+            }
+        }
+    }
+
     private var previewCard: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
             if settings.isBudgetLockScreenEnabled {
-                previewRow(icon: "lock.fill", label: "Lock Screen shows your remaining budget and progress bar.")
+                previewRow(icon: "lock.fill", label: "Lock Screen: \(previewDescription(for: settings.lockScreenContentKind))")
             }
             if settings.isBudgetDynamicIslandEnabled {
-                previewRow(icon: "capsule.inset.filled", label: "Dynamic Island shows a compact remaining-amount pill.")
+                previewRow(icon: "capsule.inset.filled", label: "Dynamic Island: \(previewDescription(for: settings.dynamicIslandContentKind))")
             }
         }
         .padding(.vertical, AppTheme.Spacing.xs)
+    }
+
+    private func previewDescription(for kind: LiveActivityContentKind) -> String {
+        switch kind {
+        case .budgetProgress: "remaining budget and spend progress bar."
+        case .savingsGoalProgress: "your nearest savings goal's progress."
+        case .dailyPace: "how much you can spend per day to stay on budget."
+        }
     }
 
     private func previewRow(icon: String, label: String) -> some View {

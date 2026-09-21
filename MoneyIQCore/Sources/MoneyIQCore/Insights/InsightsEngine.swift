@@ -149,19 +149,38 @@ public enum InsightsEngine {
 
     /// Total spend per calendar day from the start of the current month
     /// through today — the bucket granularity for the interactive
-    /// spend-over-time chart.
+    /// spend-over-time chart. A thin wrapper over `dailySpend(forMonthContaining:)`
+    /// kept for source compatibility with existing call sites/tests.
     public static func dailySpendThisMonth(
         transactions: [ExpenseTransaction],
         calendar: Calendar = .current,
         now: Date = .now
     ) -> [DailySpend] {
-        let monthStart = calendar.startOfMonth(for: now)
+        dailySpend(transactions: transactions, forMonthContaining: now, calendar: calendar, now: now)
+    }
+
+    /// Same bucketing as `dailySpendThisMonth`, generalized to any month —
+    /// lets the Insights tab show a full day-by-day chart for a past month,
+    /// or a partial (up-to-today) one when `date` is the current month.
+    public static func dailySpend(
+        transactions: [ExpenseTransaction],
+        forMonthContaining date: Date,
+        calendar: Calendar = .current,
+        now: Date = .now
+    ) -> [DailySpend] {
+        let monthStart = calendar.startOfMonth(for: date)
+        guard let monthEndExclusive = calendar.date(byAdding: .month, value: 1, to: monthStart),
+              let lastDayOfMonth = calendar.date(byAdding: .day, value: -1, to: monthEndExclusive) else {
+            return []
+        }
         let today = calendar.startOfDay(for: now)
-        guard today >= monthStart else { return [] }
+        let isCurrentMonth = calendar.startOfMonth(for: now) == monthStart
+        let endBound = isCurrentMonth ? min(today, lastDayOfMonth) : lastDayOfMonth
+        guard endBound >= monthStart else { return [] }
 
         var buckets: [Date: Decimal] = [:]
         var cursor = monthStart
-        while cursor <= today {
+        while cursor <= endBound {
             buckets[cursor] = 0
             guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
             cursor = next
@@ -169,13 +188,87 @@ public enum InsightsEngine {
 
         for transaction in transactions {
             let day = calendar.startOfDay(for: transaction.date)
-            guard day >= monthStart && day <= today else { continue }
+            guard day >= monthStart && day <= endBound else { continue }
             buckets[day, default: 0] += transaction.amount
         }
 
         return buckets
             .sorted { $0.key < $1.key }
             .map { DailySpend(day: $0.key, total: $0.value) }
+    }
+
+    /// A month's total spend vs. the immediately preceding month, plus the
+    /// percent change (nil when the previous month had zero spend, since a
+    /// percent change from zero is undefined/infinite).
+    public struct MonthOverMonthChange: Sendable {
+        public let currentTotal: Decimal
+        public let previousTotal: Decimal
+        public let percentChange: Double?
+    }
+
+    public static func monthOverMonthChange(
+        transactions: [ExpenseTransaction],
+        forMonthContaining date: Date,
+        calendar: Calendar = .current
+    ) -> MonthOverMonthChange {
+        let monthStart = calendar.startOfMonth(for: date)
+        let currentTotal = totalSpent(transactions: transactions, inMonth: monthStart, calendar: calendar)
+
+        guard let previousMonthStart = calendar.date(byAdding: .month, value: -1, to: monthStart) else {
+            return MonthOverMonthChange(currentTotal: currentTotal, previousTotal: 0, percentChange: nil)
+        }
+        let previousTotal = totalSpent(transactions: transactions, inMonth: previousMonthStart, calendar: calendar)
+
+        let percentChange: Double?
+        if previousTotal > 0 {
+            percentChange = NSDecimalNumber(decimal: (currentTotal - previousTotal) / previousTotal).doubleValue
+        } else {
+            percentChange = nil
+        }
+        return MonthOverMonthChange(currentTotal: currentTotal, previousTotal: previousTotal, percentChange: percentChange)
+    }
+
+    private static func totalSpent(transactions: [ExpenseTransaction], inMonth monthStart: Date, calendar: Calendar) -> Decimal {
+        guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return 0 }
+        return transactions
+            .filter { $0.date >= monthStart && $0.date < monthEnd }
+            .reduce(Decimal(0)) { $0 + $1.amount }
+    }
+
+    /// Top merchants by total spend for a single month — a new "who did I
+    /// spend the most with" view alongside the existing category breakdown.
+    public struct MerchantTotal: Identifiable, Sendable {
+        public let id = UUID()
+        public let merchantName: String
+        public let total: Decimal
+        public let occurrences: Int
+    }
+
+    public static func topMerchants(
+        transactions: [ExpenseTransaction],
+        forMonthContaining date: Date,
+        limit: Int = 5,
+        calendar: Calendar = .current
+    ) -> [MerchantTotal] {
+        let monthStart = calendar.startOfMonth(for: date)
+        guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return [] }
+
+        let named = transactions.filter {
+            $0.date >= monthStart && $0.date < monthEnd && $0.merchantName?.isEmpty == false
+        }
+        let byMerchant = Dictionary(grouping: named) { MerchantCategoryMapping.normalize($0.merchantName!) }
+
+        return byMerchant
+            .map { _, group in
+                MerchantTotal(
+                    merchantName: group.first?.merchantName ?? "Unknown",
+                    total: group.reduce(Decimal(0)) { $0 + $1.amount },
+                    occurrences: group.count
+                )
+            }
+            .sorted { $0.total > $1.total }
+            .prefix(limit)
+            .map { $0 }
     }
 
     // MARK: - Anomaly detection
@@ -308,7 +401,7 @@ public enum InsightsEngine {
     }
 }
 
-extension Calendar {
+public extension Calendar {
     func startOfMonth(for date: Date) -> Date {
         let comps = dateComponents([.year, .month], from: date)
         return self.date(from: comps) ?? date

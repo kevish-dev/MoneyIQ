@@ -13,24 +13,20 @@ struct BudgetLiveActivityWidget: Widget {
             if context.state.showOnDynamicIsland {
                 DynamicIsland {
                     DynamicIslandExpandedRegion(.leading) {
-                        Label(context.state.spent.formatted(.currency(code: context.state.currencyCode)), systemImage: "creditcard")
-                            .font(.caption)
+                        DynamicIslandExpandedLeading(state: context.state)
                     }
                     DynamicIslandExpandedRegion(.trailing) {
-                        Text(context.state.remaining.formatted(.currency(code: context.state.currencyCode)) + " left")
-                            .font(.caption)
+                        DynamicIslandExpandedTrailing(state: context.state)
                     }
                     DynamicIslandExpandedRegion(.bottom) {
-                        ProgressView(value: context.state.fractionUsed)
-                            .tint(context.state.fractionUsed >= 1 ? .red : .accentColor)
+                        DynamicIslandExpandedBottom(state: context.state)
                     }
                 } compactLeading: {
-                    Image(systemName: "creditcard.fill")
+                    Image(systemName: context.state.dynamicIslandKind.systemIconName)
                 } compactTrailing: {
-                    Text(context.state.remaining.formatted(.currency(code: context.state.currencyCode).precision(.fractionLength(0))))
-                        .font(.caption2)
+                    DynamicIslandCompactTrailing(state: context.state)
                 } minimal: {
-                    Image(systemName: "creditcard.fill")
+                    Image(systemName: context.state.dynamicIslandKind.systemIconName)
                 }
             } else {
                 // Dynamic Island turned off in Settings — the Activity still
@@ -50,11 +46,120 @@ struct BudgetLiveActivityWidget: Widget {
     }
 }
 
+// MARK: - Dynamic Island, per content kind
+
+private struct DynamicIslandExpandedLeading: View {
+    let state: BudgetActivityAttributes.ContentState
+
+    var body: some View {
+        switch state.dynamicIslandKind {
+        case .budgetProgress:
+            Label(state.spent.formatted(.currency(code: state.currencyCode)), systemImage: "creditcard")
+                .font(.caption)
+        case .savingsGoalProgress:
+            Label(state.goalName ?? "No goal", systemImage: "target")
+                .font(.caption)
+                .lineLimit(1)
+        case .dailyPace:
+            Label("\(state.daysRemainingInMonth)d left", systemImage: "calendar")
+                .font(.caption)
+        }
+    }
+}
+
+private struct DynamicIslandExpandedTrailing: View {
+    let state: BudgetActivityAttributes.ContentState
+
+    var body: some View {
+        switch state.dynamicIslandKind {
+        case .budgetProgress:
+            Text(state.remaining.formatted(.currency(code: state.currencyCode)) + " left")
+                .font(.caption)
+        case .savingsGoalProgress:
+            if state.goalName != nil {
+                Text(state.goalSaved.formatted(.currency(code: state.currencyCode)))
+                    .font(.caption)
+            } else {
+                Text("—").font(.caption)
+            }
+        case .dailyPace:
+            Text(state.recommendedDailySpend.formatted(.currency(code: state.currencyCode)) + "/day")
+                .font(.caption)
+        }
+    }
+}
+
+private struct DynamicIslandExpandedBottom: View {
+    let state: BudgetActivityAttributes.ContentState
+
+    var body: some View {
+        switch state.dynamicIslandKind {
+        case .budgetProgress:
+            ProgressView(value: state.fractionUsed)
+                .tint(state.fractionUsed >= 1 ? .red : .accentColor)
+        case .savingsGoalProgress:
+            if state.goalName != nil {
+                ProgressView(value: state.goalProgressFraction)
+                    .tint(.accentColor)
+            } else {
+                Text("Set a savings goal to track it here.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        case .dailyPace:
+            Text("Spend up to this much per day to stay on budget.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct DynamicIslandCompactTrailing: View {
+    let state: BudgetActivityAttributes.ContentState
+
+    var body: some View {
+        switch state.dynamicIslandKind {
+        case .budgetProgress:
+            Text(state.remaining.formatted(.currency(code: state.currencyCode).precision(.fractionLength(0))))
+                .font(.caption2)
+        case .savingsGoalProgress:
+            if state.goalName != nil {
+                Text("\(Int((state.goalProgressFraction * 100).rounded()))%")
+                    .font(.caption2)
+            } else {
+                Text("—").font(.caption2)
+            }
+        case .dailyPace:
+            Text(state.recommendedDailySpend.formatted(.currency(code: state.currencyCode).precision(.fractionLength(0))))
+                .font(.caption2)
+        }
+    }
+}
+
 private struct LockScreenView: View {
     let state: BudgetActivityAttributes.ContentState
 
     var body: some View {
         if state.showOnLockScreen {
+            content
+                .padding(16)
+        } else {
+            // Lock Screen turned off in Settings — the Activity still runs
+            // (Dynamic Island may want it), but the banner itself shows a
+            // minimal fallback instead of budget numbers.
+            HStack {
+                Label("MoneyIQ", systemImage: "creditcard.fill")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+            }
+            .padding(16)
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch state.lockScreenKind {
+        case .budgetProgress:
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Label("MoneyIQ Budget", systemImage: "creditcard.fill")
@@ -70,17 +175,41 @@ private struct LockScreenView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            .padding(16)
-        } else {
-            // Lock Screen turned off in Settings — the Activity still runs
-            // (Dynamic Island may want it), but the banner itself shows a
-            // minimal fallback instead of budget numbers.
-            HStack {
-                Label("MoneyIQ", systemImage: "creditcard.fill")
+        case .savingsGoalProgress:
+            if let goalName = state.goalName {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label(goalName, systemImage: "target")
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                        Spacer()
+                        Text("\(Int((state.goalProgressFraction * 100).rounded()))%")
+                            .font(.caption.weight(.semibold))
+                    }
+                    ProgressView(value: state.goalProgressFraction)
+                        .tint(.accentColor)
+                    Text("\(state.goalSaved.formatted(.currency(code: state.currencyCode))) of \(state.goalTarget.formatted(.currency(code: state.currencyCode))) saved")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Label("Set a savings goal to track it here", systemImage: "target")
                     .font(.caption.weight(.semibold))
-                Spacer()
+                    .foregroundStyle(.secondary)
             }
-            .padding(16)
+        case .dailyPace:
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("Daily Budget Pace", systemImage: "gauge.with.needle.fill")
+                        .font(.caption.weight(.semibold))
+                    Spacer()
+                    Text(state.recommendedDailySpend.formatted(.currency(code: state.currencyCode)) + "/day")
+                        .font(.caption.weight(.semibold))
+                }
+                Text("\(state.daysRemainingInMonth) day\(state.daysRemainingInMonth == 1 ? "" : "s") left this month — spend up to this much per day to stay on budget.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }

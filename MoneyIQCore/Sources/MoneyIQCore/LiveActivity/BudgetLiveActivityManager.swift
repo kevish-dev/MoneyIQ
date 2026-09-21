@@ -23,13 +23,9 @@ public final class BudgetLiveActivityManager {
         ActivityAuthorizationInfo().areActivitiesEnabled
     }
 
-    public func start(spent: Decimal, cap: Decimal, currencyCode: String, showOnLockScreen: Bool, showOnDynamicIsland: Bool) {
+    public func start(state: BudgetActivityAttributes.ContentState) {
         guard areActivitiesEnabled, currentActivity == nil else { return }
 
-        let state = BudgetActivityAttributes.ContentState(
-            spent: spent, cap: cap, currencyCode: currencyCode,
-            showOnLockScreen: showOnLockScreen, showOnDynamicIsland: showOnDynamicIsland
-        )
         do {
             let activity = try Activity.request(
                 attributes: BudgetActivityAttributes(),
@@ -42,12 +38,8 @@ public final class BudgetLiveActivityManager {
         }
     }
 
-    public func update(spent: Decimal, cap: Decimal, currencyCode: String, showOnLockScreen: Bool, showOnDynamicIsland: Bool) async {
+    public func update(state: BudgetActivityAttributes.ContentState) async {
         guard let currentActivity else { return }
-        let state = BudgetActivityAttributes.ContentState(
-            spent: spent, cap: cap, currencyCode: currencyCode,
-            showOnLockScreen: showOnLockScreen, showOnDynamicIsland: showOnDynamicIsland
-        )
         await currentActivity.update(.init(state: state, staleDate: nil))
     }
 

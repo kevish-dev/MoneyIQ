@@ -12,6 +12,7 @@ struct HomeView: View {
     @Query(sort: \ExpenseTransaction.date, order: .reverse) private var transactions: [ExpenseTransaction]
     @Query private var categories: [ExpenseCategory]
     @Query(sort: \Budget.createdAt, order: .reverse) private var budgets: [Budget]
+    @Query(sort: \SavingsGoal.targetDate) private var goals: [SavingsGoal]
 
     @State private var showingAddTransaction = false
     @State private var showingScreenshotImport = false
@@ -68,96 +69,191 @@ struct HomeView: View {
         categoryFilter != nil || billsOnly
     }
 
-    var body: some View {
-        NavigationStack {
-            List {
-                if let account = authManager.currentAccount {
-                    // Not wrapped in a `Section` on purpose — an empty-header
-                    // Section here was rendering a thin divider line above
-                    // the budget card in plain list style.
-                    BudgetCardView(
-                        currencyCode: account.preferredCurrencyCode,
-                        onAddExpenseManually: { showingAddTransaction = true },
-                        onAddExpenseFromScreenshot: { showingScreenshotImport = true }
-                    )
-                    .listRowInsets(EdgeInsets(
-                        top: AppTheme.Spacing.small,
-                        leading: AppTheme.Spacing.large,
-                        bottom: AppTheme.Spacing.small,
-                        trailing: AppTheme.Spacing.large
-                    ))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
+    /// Profile + filter icons, floating directly on the gradient (not in the
+    /// system nav bar) — the nav bar is hidden on Home so the hero card can
+    /// bleed behind the status bar/Dynamic Island; `.safeAreaPadding(.top)`
+    /// keeps this row itself clear of the notch even though its container
+    /// extends further up.
+    private var topBar: some View {
+        HStack {
+            ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
+            Spacer()
+            filterMenu
+        }
+        .safeAreaPadding(.top)
+        .padding(.top, AppTheme.Spacing.small)
+    }
+
+    private var filterMenu: some View {
+        Menu {
+            Picker("Sort", selection: $sortOption) {
+                ForEach(TransactionSortOption.allCases) { option in
+                    Text(option.rawValue).tag(option)
                 }
+            }
 
-                Section("Recent transactions") {
-                    if transactions.isEmpty {
-                        Text("No transactions yet.")
-                            .foregroundStyle(.secondary)
-                    } else if displayedTransactions.isEmpty {
-                        Text("No transactions match your search/filters.")
-                            .foregroundStyle(.secondary)
+            Menu("Category") {
+                Button {
+                    categoryFilter = nil
+                } label: {
+                    if categoryFilter == nil {
+                        Label("All categories", systemImage: "checkmark")
+                    } else {
+                        Text("All categories")
                     }
-                    ForEach(displayedTransactions) { transaction in
-                        HStack(spacing: 12) {
-                            IconBubble(systemName: transaction.category?.systemIconName ?? "creditcard")
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack(spacing: 6) {
-                                    Text(transaction.merchantName ?? transaction.category?.name ?? "Uncategorized")
-                                        .font(.subheadline.weight(.medium))
-                                    if transaction.isAutoImported {
-                                        Image(systemName: "text.viewfinder")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    if transaction.editedAt != nil {
-                                        Image(systemName: "pencil.circle.fill")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    if transaction.isBillLike {
-                                        Text("Bill")
-                                            .font(.caption2.weight(.semibold))
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(AppTheme.accent.opacity(0.18), in: Capsule())
-                                            .foregroundStyle(AppTheme.accent)
-                                    }
-                                }
-                                Text(relativeTimeText(for: transaction.date))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                if let note = transaction.note {
-                                    Text(note).font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            Text("-\(transaction.amount, format: .currency(code: account?.preferredCurrencyCode ?? "USD"))")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .padding(.vertical, AppTheme.Spacing.small)
-                        .contentShape(Rectangle())
-                        // Hold-to-edit/delete instead of swipe — consistent
-                        // with Split and Goals, and more discoverable than a
-                        // hidden swipe gesture.
-                        .contextMenu {
-                            Button {
-                                editingTransaction = transaction
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
-                            Button(role: .destructive) {
-                                deletingTransaction = transaction
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+                }
+                ForEach(categories) { category in
+                    Button {
+                        categoryFilter = category
+                    } label: {
+                        if categoryFilter?.id == category.id {
+                            Label(category.name, systemImage: "checkmark")
+                        } else {
+                            Text(category.name)
                         }
                     }
                 }
             }
-            .navigationTitle("MoneyIQ")
-            .compactListLayout()
+
+            Toggle(isOn: $billsOnly) {
+                Label("Bills only", systemImage: "doc.text")
+            }
+        } label: {
+            Image(systemName: isFiltering
+                ? "line.3.horizontal.decrease.circle.fill"
+                : "line.3.horizontal.decrease.circle")
+                .font(.title2)
+                .foregroundStyle(.white)
+                .padding(8)
+                .background(.white.opacity(0.18), in: Circle())
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    ZStack(alignment: .top) {
+                        if let account = authManager.currentAccount {
+                            BudgetCardView(
+                                currencyCode: account.preferredCurrencyCode,
+                                fullBleedTop: true,
+                                onAddExpenseManually: { showingAddTransaction = true },
+                                onAddExpenseFromScreenshot: { showingScreenshotImport = true }
+                            )
+                        }
+                        topBar
+                    }
+                    .padding(.horizontal, AppTheme.Spacing.large)
+                    .padding(.bottom, AppTheme.Spacing.small)
+
+                    VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
+                        // A custom field instead of `.searchable` on
+                        // purpose — `.searchable` reserves its own
+                        // always-visible slot right below the nav bar,
+                        // which blocked the hero card above from bleeding
+                        // behind the status bar/Dynamic Island.
+                        HStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundStyle(.secondary)
+                            TextField("Search transactions", text: $searchText)
+                            if !searchText.isEmpty {
+                                Button {
+                                    searchText = ""
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, AppTheme.Spacing.medium)
+                        .padding(.vertical, AppTheme.Spacing.small)
+                        .background(.thinMaterial, in: Capsule())
+                        .padding(.top, AppTheme.Spacing.medium)
+
+                        Text("Recent transactions")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, AppTheme.Spacing.xs)
+
+                        if transactions.isEmpty {
+                            Text("No transactions yet.")
+                                .foregroundStyle(.secondary)
+                        } else if displayedTransactions.isEmpty {
+                            Text("No transactions match your search/filters.")
+                                .foregroundStyle(.secondary)
+                        }
+
+                        ForEach(displayedTransactions) { transaction in
+                            HStack(spacing: 12) {
+                                IconBubble(systemName: transaction.category?.systemIconName ?? "creditcard")
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(spacing: 6) {
+                                        Text(transaction.merchantName ?? transaction.category?.name ?? "Uncategorized")
+                                            .font(.subheadline.weight(.medium))
+                                        if transaction.isAutoImported {
+                                            Image(systemName: "text.viewfinder")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        if transaction.editedAt != nil {
+                                            Image(systemName: "pencil.circle.fill")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        if transaction.isBillLike {
+                                            Text("Bill")
+                                                .font(.caption2.weight(.semibold))
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(AppTheme.accent.opacity(0.18), in: Capsule())
+                                                .foregroundStyle(AppTheme.accent)
+                                        }
+                                    }
+                                    Text(relativeTimeText(for: transaction.date))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    if let note = transaction.note {
+                                        Text(note).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Text("-\(transaction.amount, format: .currency(code: account?.preferredCurrencyCode ?? "USD"))")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .padding(.vertical, AppTheme.Spacing.small)
+                            .contentShape(Rectangle())
+                            // Hold-to-edit/delete instead of swipe — consistent
+                            // with Split and Goals, and more discoverable than
+                            // a hidden swipe gesture.
+                            .contextMenu {
+                                Button {
+                                    editingTransaction = transaction
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) {
+                                    deletingTransaction = transaction
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                            if transaction.id != displayedTransactions.last?.id {
+                                Divider()
+                            }
+                        }
+                    }
+                    .padding(.horizontal, AppTheme.Spacing.large)
+                    .padding(.bottom, AppTheme.Spacing.large)
+                }
+            }
+            .scrollClipDisabled()
+            .navigationTitle("")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
+            #endif
             .alert(
                 "Delete Transaction?",
                 isPresented: Binding(
@@ -170,56 +266,6 @@ struct HomeView: View {
                 Button("Cancel", role: .cancel) {}
             } message: { _ in
                 Text("This can't be undone.")
-            }
-            .searchable(text: $searchText, prompt: "Search transactions")
-            // The toolbar "Add" menu was removed — there's now a single
-            // entry point for starting a new transaction: the "Add Expense"
-            // button on the budget card, which itself presents the same
-            // "Enter Manually" / "From Screenshot" choice as a menu.
-            .toolbar {
-                ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
-                    ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
-                }
-                ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
-                    Menu {
-                        Picker("Sort", selection: $sortOption) {
-                            ForEach(TransactionSortOption.allCases) { option in
-                                Text(option.rawValue).tag(option)
-                            }
-                        }
-
-                        Menu("Category") {
-                            Button {
-                                categoryFilter = nil
-                            } label: {
-                                if categoryFilter == nil {
-                                    Label("All categories", systemImage: "checkmark")
-                                } else {
-                                    Text("All categories")
-                                }
-                            }
-                            ForEach(categories) { category in
-                                Button {
-                                    categoryFilter = category
-                                } label: {
-                                    if categoryFilter?.id == category.id {
-                                        Label(category.name, systemImage: "checkmark")
-                                    } else {
-                                        Text(category.name)
-                                    }
-                                }
-                            }
-                        }
-
-                        Toggle(isOn: $billsOnly) {
-                            Label("Bills only", systemImage: "doc.text")
-                        }
-                    } label: {
-                        Image(systemName: isFiltering
-                            ? "line.3.horizontal.decrease.circle.fill"
-                            : "line.3.horizontal.decrease.circle")
-                    }
-                }
             }
             .sheet(item: $editingTransaction) { transaction in
                 EditTransactionView(transaction: transaction, categories: categories)
@@ -244,22 +290,27 @@ struct HomeView: View {
                 }
                 guard let budget = budgets.first, let account = authManager.currentAccount else { return }
                 let progress = BudgetEngine.monthProgress(for: budget, transactions: transactions)
+                let pace = BudgetEngine.dailyPace(remaining: progress.remaining)
+                let nearestGoal = goals.first { !$0.isComplete }
+
+                let state = BudgetActivityAttributes.ContentState(
+                    spent: progress.spent,
+                    cap: progress.effectiveCap,
+                    currencyCode: account.preferredCurrencyCode,
+                    showOnLockScreen: settings.isBudgetLockScreenEnabled,
+                    showOnDynamicIsland: settings.isBudgetDynamicIslandEnabled,
+                    lockScreenKind: settings.lockScreenContentKind,
+                    dynamicIslandKind: settings.dynamicIslandContentKind,
+                    goalName: nearestGoal?.name,
+                    goalSaved: nearestGoal?.savedAmount ?? 0,
+                    goalTarget: nearestGoal?.targetAmount ?? 0,
+                    recommendedDailySpend: pace.recommendedDailySpend,
+                    daysRemainingInMonth: pace.daysRemaining
+                )
                 if liveActivityManager.isActive {
-                    await liveActivityManager.update(
-                        spent: progress.spent,
-                        cap: progress.effectiveCap,
-                        currencyCode: account.preferredCurrencyCode,
-                        showOnLockScreen: settings.isBudgetLockScreenEnabled,
-                        showOnDynamicIsland: settings.isBudgetDynamicIslandEnabled
-                    )
+                    await liveActivityManager.update(state: state)
                 } else {
-                    liveActivityManager.start(
-                        spent: progress.spent,
-                        cap: progress.effectiveCap,
-                        currencyCode: account.preferredCurrencyCode,
-                        showOnLockScreen: settings.isBudgetLockScreenEnabled,
-                        showOnDynamicIsland: settings.isBudgetDynamicIslandEnabled
-                    )
+                    liveActivityManager.start(state: state)
                 }
             }
             #endif
@@ -268,7 +319,7 @@ struct HomeView: View {
 
     #if os(iOS)
     private var liveActivitySyncKey: String {
-        "\(settings.isBudgetLockScreenEnabled)-\(settings.isBudgetDynamicIslandEnabled)-\(budgets.first?.id.uuidString ?? "none")-\(transactions.count)"
+        "\(settings.isBudgetLockScreenEnabled)-\(settings.isBudgetDynamicIslandEnabled)-\(settings.lockScreenContentKind.rawValue)-\(settings.dynamicIslandContentKind.rawValue)-\(budgets.first?.id.uuidString ?? "none")-\(transactions.count)-\(goals.count)"
     }
     #endif
 
