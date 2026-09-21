@@ -198,10 +198,10 @@ struct HomeView: View {
                     SharedReceiptImportView(sharedText: clipboardImportText)
                 }
             }
-            .alert("Clipboard is empty", isPresented: $clipboardEmptyAlert) {
+            .alert("Nothing to import", isPresented: $clipboardEmptyAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("Copy a payment message or share it from a UPI app first, then try again.")
+                Text("Copy or share a payment message/receipt from a UPI app first, then try again.")
             }
             #if os(iOS)
             // Keeps the Lock Screen / Dynamic Island Live Activity in sync
@@ -267,13 +267,30 @@ struct HomeView: View {
     /// Reliable fallback for the share-extension handoff, which has been
     /// observed to sometimes not switch to MoneyIQ at all — the extension
     /// always copies the shared payment text to the clipboard regardless,
-    /// so this works even when that automatic handoff doesn't.
+    /// so this works even when that automatic handoff doesn't. Also covers
+    /// manually copying a receipt from a UPI app: several apps (Slice,
+    /// notably) put a rendered IMAGE on the clipboard rather than text when
+    /// you tap their own "Copy" button — this OCRs that image with the same
+    /// pipeline used for screenshot import, so either kind of clipboard
+    /// content works.
     private func pasteFromClipboard() {
-        guard let text = clipboardString, !text.isEmpty else {
-            clipboardEmptyAlert = true
+        if let text = clipboardString, !text.isEmpty {
+            clipboardImportText = text
             return
         }
-        clipboardImportText = text
+        #if os(iOS)
+        if let image = UIPasteboard.general.image, let cgImage = image.cgImage {
+            Task {
+                if let parsed = try? await ReceiptParser.parse(cgImage: cgImage), !parsed.rawText.isEmpty {
+                    clipboardImportText = parsed.rawText
+                } else {
+                    clipboardEmptyAlert = true
+                }
+            }
+            return
+        }
+        #endif
+        clipboardEmptyAlert = true
     }
 
     private var clipboardString: String? {
