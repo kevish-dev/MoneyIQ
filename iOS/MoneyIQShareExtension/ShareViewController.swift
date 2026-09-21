@@ -70,6 +70,15 @@ final class ShareViewController: UIViewController {
     }
 
     private func forward(text: String) {
+        // Always copy to the clipboard first — this doesn't depend on the
+        // cross-process URL-open handoff below, which has been observed
+        // unreliable on-device for this extension type (share sheet closes
+        // with nothing happening, even with completeRequest/open ordering
+        // fixes). MoneyIQ's Add Expense menu has a "Paste from Clipboard"
+        // entry that reads this directly, so the feature still works end
+        // to end even if the automatic open() handoff never fires.
+        UIPasteboard.general.string = text
+
         var components = URLComponents()
         components.scheme = "moneyiq"
         components.host = "import-share"

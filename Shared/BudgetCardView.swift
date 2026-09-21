@@ -13,6 +13,7 @@ struct BudgetCardView: View {
     /// menu on Home was removed in favor of this one).
     var onAddExpenseManually: (() -> Void)?
     var onAddExpenseFromScreenshot: (() -> Void)?
+    var onAddExpenseFromClipboard: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Budget.createdAt, order: .reverse) private var budgets: [Budget]
@@ -132,6 +133,11 @@ struct BudgetCardView: View {
                     onAddExpenseFromScreenshot?()
                 } label: {
                     Label("From Screenshot", systemImage: "text.viewfinder")
+                }
+                Button {
+                    onAddExpenseFromClipboard?()
+                } label: {
+                    Label("Paste from Clipboard", systemImage: "doc.on.clipboard")
                 }
             } label: {
                 Label("Add Expense", systemImage: "plus")

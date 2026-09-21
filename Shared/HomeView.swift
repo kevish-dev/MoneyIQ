@@ -16,6 +16,8 @@ struct HomeView: View {
 
     @State private var showingAddTransaction = false
     @State private var showingScreenshotImport = false
+    @State private var clipboardImportText: String?
+    @State private var clipboardEmptyAlert = false
     @State private var editingTransaction: ExpenseTransaction?
     @State private var deletingTransaction: ExpenseTransaction?
     @State private var searchText = ""
@@ -91,7 +93,8 @@ struct HomeView: View {
                     BudgetCardView(
                         currencyCode: account.preferredCurrencyCode,
                         onAddExpenseManually: { showingAddTransaction = true },
-                        onAddExpenseFromScreenshot: { showingScreenshotImport = true }
+                        onAddExpenseFromScreenshot: { showingScreenshotImport = true },
+                        onAddExpenseFromClipboard: { pasteFromClipboard() }
                     )
                     .listRowInsets(EdgeInsets(
                         top: AppTheme.Spacing.small,
@@ -187,6 +190,19 @@ struct HomeView: View {
             .sheet(isPresented: $showingScreenshotImport) {
                 ScreenshotImportView(categories: categories)
             }
+            .sheet(isPresented: Binding(
+                get: { clipboardImportText != nil },
+                set: { if !$0 { clipboardImportText = nil } }
+            )) {
+                if let clipboardImportText {
+                    SharedReceiptImportView(sharedText: clipboardImportText)
+                }
+            }
+            .alert("Clipboard is empty", isPresented: $clipboardEmptyAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Copy a payment message or share it from a UPI app first, then try again.")
+            }
             #if os(iOS)
             // Keeps the Lock Screen / Dynamic Island Live Activity in sync
             // with real budget data whenever it changes — opt-in via
@@ -248,7 +264,32 @@ struct HomeView: View {
         }
     }
 
+    /// Reliable fallback for the share-extension handoff, which has been
+    /// observed to sometimes not switch to MoneyIQ at all — the extension
+    /// always copies the shared payment text to the clipboard regardless,
+    /// so this works even when that automatic handoff doesn't.
+    private func pasteFromClipboard() {
+        guard let text = clipboardString, !text.isEmpty else {
+            clipboardEmptyAlert = true
+            return
+        }
+        clipboardImportText = text
+    }
+
+    private var clipboardString: String? {
+        #if os(iOS)
+        UIPasteboard.general.string
+        #elseif os(macOS)
+        NSPasteboard.general.string(forType: .string)
+        #endif
+    }
 }
+
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 /// Pulled out of `HomeView.body` as its own view — the whole List was one
 /// enormous expression that the type-checker choked on ("unable to
