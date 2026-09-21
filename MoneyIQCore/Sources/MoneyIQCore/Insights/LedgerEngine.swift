@@ -31,4 +31,30 @@ public enum LedgerEngine {
         // from them, i.e. direction .theyPaid brings the balance back to 0.
         return net > 0 ? (net, .theyPaid) : (-net, .iPaid)
     }
+
+    /// Splits `total` equally among `participantCount` people, rounded to
+    /// the nearest paisa/cent, with any leftover remainder (a naive
+    /// division like ₹100 ÷ 3 doesn't divide evenly) distributed one unit
+    /// at a time to the first few shares — so the returned shares always
+    /// sum to exactly `total`, never off by a fraction. Used by "Split a
+    /// Bill": the caller keeps the last share for themselves (the payer)
+    /// and creates one `LedgerEntry` per remaining share.
+    public static func splitEqually(total: Decimal, participantCount: Int) -> [Decimal] {
+        guard participantCount > 0, total > 0 else { return [] }
+
+        let totalMinorUnits = NSDecimalNumber(decimal: total * 100)
+            .rounding(accordingToBehavior: NSDecimalNumberHandler(
+                roundingMode: .plain, scale: 0, raiseOnExactness: false,
+                raiseOnOverflow: false, raiseOnUnderflow: false, raiseOnDivideByZero: false
+            ))
+            .int64Value
+        let count = Int64(participantCount)
+        let baseMinorUnits = totalMinorUnits / count
+        let remainder = totalMinorUnits % count
+
+        return (0..<participantCount).map { index in
+            let minorUnits = baseMinorUnits + (Int64(index) < remainder ? 1 : 0)
+            return Decimal(minorUnits) / 100
+        }
+    }
 }

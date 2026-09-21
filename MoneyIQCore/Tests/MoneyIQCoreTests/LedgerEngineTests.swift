@@ -72,4 +72,27 @@ struct LedgerEngineTests {
         entries.append(LedgerEntry(amount: 10000, direction: .iPaid, isSettlement: true))
         #expect(LedgerEngine.balanceState(for: entries) == .youOweThem(8000))
     }
+
+    @Test func splitEquallyDividesEvenly() {
+        #expect(LedgerEngine.splitEqually(total: 2000, participantCount: 4) == [500, 500, 500, 500])
+    }
+
+    /// ₹100 ÷ 3 doesn't divide evenly in paise — shares should still sum to
+    /// exactly the total, with the remainder distributed one paisa at a
+    /// time to the first shares.
+    @Test func splitEquallyDistributesRemainderExactly() {
+        let shares = LedgerEngine.splitEqually(total: 100, participantCount: 3)
+        #expect(shares == [Decimal(string: "33.34")!, Decimal(string: "33.33")!, Decimal(string: "33.33")!])
+        #expect(shares.reduce(0, +) == 100)
+    }
+
+    @Test func splitEquallyWithOneParticipantReturnsWholeTotal() {
+        #expect(LedgerEngine.splitEqually(total: 500, participantCount: 1) == [500])
+    }
+
+    @Test func splitEquallyWithZeroOrNegativeInputsReturnsEmpty() {
+        #expect(LedgerEngine.splitEqually(total: 0, participantCount: 4).isEmpty)
+        #expect(LedgerEngine.splitEqually(total: -100, participantCount: 4).isEmpty)
+        #expect(LedgerEngine.splitEqually(total: 100, participantCount: 0).isEmpty)
+    }
 }

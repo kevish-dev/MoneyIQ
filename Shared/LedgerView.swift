@@ -15,6 +15,7 @@ struct LedgerView: View {
     @Query(sort: \LedgerContact.createdAt, order: .reverse) private var contacts: [LedgerContact]
 
     @State private var showingAddContact = false
+    @State private var showingSplitBill = false
     @State private var renamingContact: LedgerContact?
     @State private var contactsPendingDelete: [LedgerContact]?
     @State private var searchText = ""
@@ -168,15 +169,28 @@ struct LedgerView: View {
                     }
                 }
                 ToolbarItem {
-                    Button {
-                        showingAddContact = true
+                    Menu {
+                        Button {
+                            showingAddContact = true
+                        } label: {
+                            Label("Add Person", systemImage: "person.badge.plus")
+                        }
+                        Button {
+                            showingSplitBill = true
+                        } label: {
+                            Label("Split a Bill", systemImage: "person.3.sequence")
+                        }
+                        .disabled(contacts.isEmpty)
                     } label: {
-                        Label("Add Person", systemImage: "person.badge.plus")
+                        Label("Add", systemImage: "plus")
                     }
                 }
             }
             .sheet(isPresented: $showingAddContact) {
                 AddContactView()
+            }
+            .sheet(isPresented: $showingSplitBill) {
+                SplitBillView(currencyCode: currencyCode)
             }
             .sheet(item: $renamingContact) { contact in
                 RenameContactView(contact: contact)
