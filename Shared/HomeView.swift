@@ -305,6 +305,7 @@ private struct AddTransactionView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var amountText = ""
+    @State private var merchantName = ""
     @State private var note = ""
     @State private var selectedCategory: ExpenseCategory?
     @State private var paymentMethod: PaymentMethod = .cash
@@ -317,6 +318,7 @@ private struct AddTransactionView: View {
                     #if os(iOS)
                     .keyboardType(.decimalPad)
                     #endif
+                TextField("Paid to (merchant, person, etc.)", text: $merchantName)
                 Picker("Category", selection: $selectedCategory) {
                     Text("None").tag(ExpenseCategory?.none)
                     ForEach(categories) { category in
@@ -351,11 +353,16 @@ private struct AddTransactionView: View {
             amount: amount,
             date: date,
             note: note.isEmpty ? nil : note,
+            merchantName: merchantName.isEmpty ? nil : merchantName,
             paymentMethod: paymentMethod,
             category: selectedCategory
         )
         modelContext.insert(transaction)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("MoneyIQ: failed to save transaction: \(error)")
+        }
         dismiss()
     }
 }
@@ -368,6 +375,7 @@ private struct EditTransactionView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var amountText: String
+    @State private var merchantName: String
     @State private var note: String
     @State private var selectedCategory: ExpenseCategory?
     @State private var paymentMethod: PaymentMethod
@@ -377,6 +385,7 @@ private struct EditTransactionView: View {
         self.transaction = transaction
         self.categories = categories
         _amountText = State(initialValue: NSDecimalNumber(decimal: transaction.amount).stringValue)
+        _merchantName = State(initialValue: transaction.merchantName ?? "")
         _note = State(initialValue: transaction.note ?? "")
         _selectedCategory = State(initialValue: transaction.category)
         _paymentMethod = State(initialValue: transaction.paymentMethod)
@@ -390,6 +399,7 @@ private struct EditTransactionView: View {
                     #if os(iOS)
                     .keyboardType(.decimalPad)
                     #endif
+                TextField("Paid to (merchant, person, etc.)", text: $merchantName)
                 Picker("Category", selection: $selectedCategory) {
                     Text("None").tag(ExpenseCategory?.none)
                     ForEach(categories) { category in
@@ -422,6 +432,7 @@ private struct EditTransactionView: View {
         guard let amount = Decimal(string: amountText) else { return }
         transaction.amount = amount
         transaction.date = date
+        transaction.merchantName = merchantName.isEmpty ? nil : merchantName
         transaction.note = note.isEmpty ? nil : note
         transaction.paymentMethod = paymentMethod
         transaction.category = selectedCategory
