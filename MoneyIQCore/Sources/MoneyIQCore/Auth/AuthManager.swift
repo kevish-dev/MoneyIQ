@@ -50,6 +50,30 @@ public final class AuthManager {
         UserDefaults.standard.removeObject(forKey: Self.currentAccountIDKey)
     }
 
+    /// A `BackupManager.restore` wipes and reinserts every model, so any
+    /// `UserAccount` reference held from before (including `currentAccount`)
+    /// now points at a deleted object. Call this right after a restore to
+    /// re-resolve it against the freshly restored data — same account ID
+    /// when the backup was of this same account, or whichever account the
+    /// backup brought in on a fresh reinstall with no prior session.
+    public func refreshAfterRestore() {
+        if let id = currentAccount?.id {
+            let descriptor = FetchDescriptor<UserAccount>(predicate: #Predicate { $0.id == id })
+            if let account = try? modelContext.fetch(descriptor).first {
+                currentAccount = account
+                UserDefaults.standard.set(account.id.uuidString, forKey: Self.currentAccountIDKey)
+                return
+            }
+        }
+        if let account = try? modelContext.fetch(FetchDescriptor<UserAccount>()).first {
+            currentAccount = account
+            UserDefaults.standard.set(account.id.uuidString, forKey: Self.currentAccountIDKey)
+        } else {
+            currentAccount = nil
+            UserDefaults.standard.removeObject(forKey: Self.currentAccountIDKey)
+        }
+    }
+
     #if DEBUG
     /// Bypasses real sign-in entirely so the rest of the app can be clicked
     /// through without OAuth credentials configured. Debug-only by build

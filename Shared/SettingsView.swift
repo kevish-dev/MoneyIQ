@@ -20,6 +20,7 @@ struct SettingsView: View {
         Form {
             securitySection
             notificationsSection
+            dataSection
             accountSection
         }
         .navigationTitle("Settings")
@@ -95,6 +96,20 @@ struct SettingsView: View {
             Text("Notifications")
         } footer: {
             Text("Reminders are scheduled entirely on this device.")
+        }
+    }
+
+    private var dataSection: some View {
+        Section {
+            NavigationLink {
+                BackupRestoreView(authManager: authManager)
+            } label: {
+                Label("Backup & Restore", systemImage: "arrow.clockwise.icloud")
+            }
+        } header: {
+            Text("Data")
+        } footer: {
+            Text("Export your data so it survives an uninstall, or restore it on a new device.")
         }
     }
 
