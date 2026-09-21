@@ -7,6 +7,12 @@ import MoneyIQCore
 /// for it despite having the data model.
 struct BudgetCardView: View {
     let currencyCode: String
+    /// Both are optional so previews/tests that don't need the sheet
+    /// wiring can omit them, but Home passes both — this button is the
+    /// single entry point for starting a new transaction (the old toolbar
+    /// menu on Home was removed in favor of this one).
+    var onAddExpenseManually: (() -> Void)?
+    var onAddExpenseFromScreenshot: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Budget.createdAt, order: .reverse) private var budgets: [Budget]
@@ -20,52 +26,122 @@ struct BudgetCardView: View {
         Group {
             if let budget = activeBudget {
                 let progress = BudgetEngine.monthProgress(for: budget, transactions: transactions)
-                Button {
-                    showingEditor = true
-                } label: {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("This Month's Budget")
-                                .font(.subheadline.weight(.semibold))
-                            Spacer()
-                            if budget.rolloverEnabled && progress.rolloverFromLastMonth > 0 {
-                                Label("+\(progress.rolloverFromLastMonth.formatted(.currency(code: currencyCode))) rolled over", systemImage: "arrow.triangle.2.circlepath")
-                                    .font(.caption2.weight(.medium))
-                                    .foregroundStyle(.green)
-                            }
-                        }
-
-                        ProgressView(value: progress.fractionUsed)
-                            .tint(progress.fractionUsed >= 1 ? .red : .accentColor)
-
-                        HStack {
-                            Text("\(progress.spent.formatted(.currency(code: currencyCode))) spent")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text("\(progress.remaining.formatted(.currency(code: currencyCode))) left of \(progress.effectiveCap.formatted(.currency(code: currencyCode)))")
-                                .font(.caption)
-                                .foregroundStyle(progress.remaining < 0 ? .red : .secondary)
-                        }
+                VStack(spacing: 14) {
+                    Button {
+                        showingEditor = true
+                    } label: {
+                        heroContent(budget: budget, progress: progress)
                     }
-                    .padding(14)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .buttonStyle(.plain)
+
+                    quickActions
                 }
-                .buttonStyle(.plain)
             } else {
                 Button {
                     showingEditor = true
                 } label: {
                     Label("Set a monthly budget", systemImage: "plus.circle")
                         .frame(maxWidth: .infinity)
-                        .padding(14)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .padding(AppTheme.Spacing.large)
+                        .foregroundStyle(.white)
+                        .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
                 }
                 .buttonStyle(.plain)
             }
         }
         .sheet(isPresented: $showingEditor) {
             BudgetEditView(budget: activeBudget, currencyCode: currencyCode)
+        }
+    }
+
+    private func heroContent(budget: Budget, progress: BudgetEngine.MonthProgress) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("This Month's Budget")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                Spacer()
+                if budget.rolloverEnabled && progress.rolloverFromLastMonth > 0 {
+                    Label("+\(progress.rolloverFromLastMonth.formatted(.currency(code: currencyCode))) rolled over", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.white)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Remaining")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.7))
+                Text(progress.remaining, format: .currency(code: currencyCode))
+                    .font(.system(size: 38, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+
+            HStack(spacing: 6) {
+                Image(systemName: progress.fractionUsed >= 1 ? "arrow.up.right" : "chart.pie.fill")
+                    .font(.caption2.weight(.bold))
+                Text("\(Int((progress.fractionUsed * 100).rounded()))% of \(progress.effectiveCap.formatted(.currency(code: currencyCode))) used")
+                    .font(.caption.weight(.medium))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, AppTheme.Spacing.medium)
+            .padding(.vertical, AppTheme.Spacing.small)
+            .background(AppTheme.pillBackgroundOnHero, in: Capsule())
+
+            ProgressView(value: min(progress.fractionUsed, 1))
+                .tint(.white)
+                .background(Color.white.opacity(0.2), in: Capsule())
+
+            HStack {
+                Text("\(progress.spent.formatted(.currency(code: currencyCode))) spent")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.75))
+                Spacer()
+                Text("of \(progress.effectiveCap.formatted(.currency(code: currencyCode))) cap")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.75))
+            }
+        }
+        .padding(AppTheme.Spacing.large)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
+        .shadow(color: AppTheme.emberRed.opacity(0.3), radius: 16, y: 10)
+    }
+
+    private var quickActions: some View {
+        HStack(spacing: AppTheme.Spacing.medium) {
+            Button {
+                showingEditor = true
+            } label: {
+                Label("Edit Budget", systemImage: "slider.horizontal.3")
+                    .labelStyle(.titleAndIcon)
+                    .font(.subheadline.weight(.medium))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, AppTheme.Spacing.medium)
+            }
+            .buttonStyle(.bordered)
+            .tint(AppTheme.accent)
+
+            Menu {
+                Button {
+                    onAddExpenseManually?()
+                } label: {
+                    Label("Enter Manually", systemImage: "square.and.pencil")
+                }
+                Button {
+                    onAddExpenseFromScreenshot?()
+                } label: {
+                    Label("From Screenshot", systemImage: "text.viewfinder")
+                }
+            } label: {
+                Label("Add Expense", systemImage: "plus")
+                    .labelStyle(.titleAndIcon)
+                    .font(.subheadline.weight(.medium))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, AppTheme.Spacing.medium)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppTheme.accent)
         }
     }
 }
@@ -103,8 +179,15 @@ private struct BudgetEditView: View {
                 Text("If you spend less than your cap this month, the leftover adds to next month's budget. Overspending never carries forward.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+
+                if budget != nil {
+                    Section {
+                        Button("Delete Budget", role: .destructive) { deleteBudget() }
+                    }
+                }
             }
             .navigationTitle(budget == nil ? "Set Budget" : "Edit Budget")
+            .compactFormLayout()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
@@ -126,7 +209,22 @@ private struct BudgetEditView: View {
             let newBudget = Budget(monthlyCapAmount: cap, currencyCode: currencyCode, rolloverEnabled: rolloverEnabled)
             modelContext.insert(newBudget)
         }
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("MoneyIQ: failed to save budget: \(error)")
+        }
+        dismiss()
+    }
+
+    private func deleteBudget() {
+        guard let budget else { return }
+        modelContext.delete(budget)
+        do {
+            try modelContext.save()
+        } catch {
+            print("MoneyIQ: failed to delete budget: \(error)")
+        }
         dismiss()
     }
 }

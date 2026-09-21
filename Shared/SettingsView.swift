@@ -24,6 +24,7 @@ struct SettingsView: View {
                 accountSection
             }
             .navigationTitle("Settings")
+            .compactFormLayout()
             .alert(
                 "Notifications are off",
                 isPresented: Binding(
@@ -92,6 +93,10 @@ struct SettingsView: View {
             } label: {
                 Label("Custom Payment Reminders", systemImage: "bell.badge")
             }
+
+            #if os(iOS)
+            Toggle("Show budget on Lock Screen & Dynamic Island", isOn: $settings.isBudgetLiveActivityEnabled)
+            #endif
         } header: {
             Text("Notifications")
         } footer: {

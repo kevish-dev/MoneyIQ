@@ -20,6 +20,30 @@ struct InsightsView: View {
         InsightsEngine.categoryBreakdown(transactions: transactions)
     }
 
+    private var categoryShares: [InsightsEngine.CategoryShare] {
+        InsightsEngine.categoryShares(transactions: transactions)
+    }
+
+    private var dailySpend: [InsightsEngine.DailySpend] {
+        InsightsEngine.dailySpendThisMonth(transactions: transactions)
+    }
+
+    private var monthTotalSpend: Decimal {
+        categoryBreakdown.reduce(Decimal(0)) { $0 + $1.total }
+    }
+
+    /// Percent change vs. the prior month, for the hero card's pill —
+    /// derived from the existing `monthlyTotals` bucketing rather than a
+    /// new engine function, since the two already-adjacent months it needs
+    /// are already in that array.
+    private var monthOverMonthChange: Double? {
+        guard monthlyTotals.count >= 2 else { return nil }
+        let current = monthlyTotals[monthlyTotals.count - 1].total
+        let previous = monthlyTotals[monthlyTotals.count - 2].total
+        guard previous > 0 else { return nil }
+        return NSDecimalNumber(decimal: (current - previous) / previous).doubleValue
+    }
+
     private var anomalies: [InsightsEngine.Anomaly] {
         InsightsEngine.anomalies(in: transactions)
     }
@@ -38,20 +62,25 @@ struct InsightsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
                     if transactions.isEmpty {
                         emptyState
                     } else {
+                        spendChartHeroCard
                         cashFlowCard
-                        trendSection
-                        categorySection
+                        categoryBubbleSection
                         if !anomalies.isEmpty { anomalySection }
                         if !subscriptions.isEmpty { subscriptionSection }
                     }
                 }
-                .padding()
+                .padding(.horizontal, AppTheme.Spacing.large)
+                .padding(.top, AppTheme.Spacing.small)
+                .padding(.bottom, AppTheme.Spacing.large)
             }
             .navigationTitle("Insights")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
     }
 
@@ -100,7 +129,7 @@ struct InsightsView: View {
                 }
             }
         }
-        .padding()
+        .padding(AppTheme.Spacing.large)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
@@ -111,49 +140,107 @@ struct InsightsView: View {
         }
     }
 
-    private var trendSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Spending Trend")
-                .font(.headline)
-            Chart(monthlyTotals) { entry in
-                BarMark(
-                    x: .value("Month", entry.monthStart, unit: .month),
-                    y: .value("Total", NSDecimalNumber(decimal: entry.total).doubleValue)
-                )
-                .foregroundStyle(.tint)
-                .cornerRadius(6)
+    /// Dark orange/red hero card with the current month's total spend and
+    /// the interactive scrub/hover line chart — matches the design
+    /// reference's balance-card-plus-chart pattern (image 4).
+    private var spendChartHeroCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Spent This Month")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.8))
+                Spacer()
+                if let change = monthOverMonthChange {
+                    Label(
+                        change.formatted(.percent.precision(.fractionLength(1))),
+                        systemImage: change >= 0 ? "arrow.up.right" : "arrow.down.right"
+                    )
+                    .font(.caption2.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(AppTheme.pillBackgroundOnHero, in: Capsule())
+                    .foregroundStyle(.white)
+                }
             }
-            .frame(height: 180)
+
+            Text(monthTotalSpend, format: .currency(code: currencyCode))
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+
+            if dailySpend.isEmpty {
+                Text("No spending yet this month.")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .frame(height: 140)
+            } else {
+                InteractiveSpendChart(data: dailySpend, currencyCode: currencyCode)
+                    .frame(height: 160)
+            }
         }
+        .padding(AppTheme.Spacing.large)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
+        .shadow(color: AppTheme.emberRed.opacity(0.3), radius: 16, y: 10)
     }
 
-    private var categorySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    /// The category bubble chart, plus a compact "top categories" stat row
+    /// beneath it — the design reference's expense-breakdown screen
+    /// (image 3), reskinned in the app's orange palette.
+    private var categoryBubbleSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
             Text("This Month by Category")
                 .font(.headline)
-            if categoryBreakdown.isEmpty {
+            if categoryShares.isEmpty {
                 Text("No spending yet this month.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
-                Chart(categoryBreakdown) { entry in
-                    SectorMark(
-                        angle: .value("Total", NSDecimalNumber(decimal: entry.total).doubleValue),
-                        innerRadius: .ratio(0.6)
-                    )
-                    .foregroundStyle(by: .value("Category", entry.categoryName))
-                    .cornerRadius(4)
+                CategoryBubbleChart(shares: categoryShares)
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("Expenses").font(.headline)
+                        Spacer()
+                    }
+                    Text(monthTotalSpend, format: .currency(code: currencyCode))
+                        .font(.title2.bold())
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(categoryShares.prefix(4)) { share in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        Text(share.categoryName)
+                                            .font(.caption.weight(.medium))
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Image(systemName: share.systemIconName)
+                                            .font(.caption)
+                                            .foregroundStyle(AppTheme.accent)
+                                    }
+                                    Text(share.total, format: .currency(code: currencyCode))
+                                        .font(.subheadline.weight(.semibold))
+                                }
+                                .padding(12)
+                                .frame(width: 140, alignment: .leading)
+                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                        }
+                    }
                 }
-                .frame(height: 220)
             }
         }
+        .padding(AppTheme.Spacing.large)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
     }
 
     private var anomalySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Unusual Spending", systemImage: "exclamationmark.triangle.fill")
                 .font(.headline)
-                .foregroundStyle(.orange)
+                .foregroundStyle(.red)
             ForEach(anomalies.prefix(5), id: \.transaction.id) { anomaly in
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -168,7 +255,7 @@ struct InsightsView: View {
                         .font(.subheadline.weight(.semibold))
                 }
                 .padding(12)
-                .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         }
     }

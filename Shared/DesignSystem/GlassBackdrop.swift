@@ -12,8 +12,8 @@ struct GlassBackdrop: View {
             ZStack {
                 LinearGradient(
                     colors: [
-                        Color(red: 0.90, green: 0.94, blue: 1.0),
-                        Color(red: 0.96, green: 0.97, blue: 1.0)
+                        Color(red: 1.0, green: 0.95, blue: 0.90),
+                        Color(red: 1.0, green: 0.97, blue: 0.95)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -26,14 +26,14 @@ struct GlassBackdrop: View {
                 Circle()
                     .fill(.clear)
                     .frame(width: size.width * 0.75, height: size.width * 0.75)
-                    .glassEffect(.regular.tint(.indigo.opacity(0.5)), in: Circle())
+                    .glassEffect(.regular.tint(AppTheme.emberRed.opacity(0.5)), in: Circle())
                     .position(x: size.width * 0.92, y: size.height * 0.02)
                     .opacity(0.9)
 
                 Circle()
                     .fill(.clear)
                     .frame(width: size.width * 0.95, height: size.width * 0.95)
-                    .glassEffect(.regular.tint(.purple.opacity(0.55)), in: Circle())
+                    .glassEffect(.regular.tint(AppTheme.accent.opacity(0.55)), in: Circle())
                     .position(x: size.width * 0.05, y: size.height * 0.88)
                     .opacity(0.9)
             }

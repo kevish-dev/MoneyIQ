@@ -28,13 +28,17 @@ struct NetWorthView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Net Worth")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.8))
                         Text(netWorth, format: .currency(code: currencyCode))
                             .font(.system(size: 32, weight: .bold, design: .rounded))
-                            .foregroundStyle(netWorth < 0 ? .red : .primary)
+                            .foregroundStyle(.white)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
+                    .padding(AppTheme.Spacing.large)
+                    .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .padding(.vertical, AppTheme.Spacing.small)
                 }
 
                 if !assets.isEmpty {
@@ -60,6 +64,7 @@ struct NetWorthView: View {
                 }
             }
             .navigationTitle("Net Worth")
+            .compactListLayout()
             .toolbar {
                 ToolbarItem {
                     Button {
@@ -76,15 +81,18 @@ struct NetWorthView: View {
     }
 
     private func accountRow(_ account: NetWorthAccount) -> some View {
-        HStack {
-            Image(systemName: account.systemIconName)
-                .foregroundStyle(.tint)
-                .frame(width: 28)
+        HStack(spacing: 12) {
+            IconBubble(
+                systemName: account.systemIconName,
+                tint: account.kind == .liability ? .red : AppTheme.accent,
+                diameter: 34
+            )
             Text(account.name)
             Spacer()
             Text(account.balance, format: .currency(code: account.currencyCode))
                 .foregroundStyle(.secondary)
         }
+        .padding(.vertical, AppTheme.Spacing.small)
     }
 
     private func delete(_ group: [NetWorthAccount], at offsets: IndexSet) {
@@ -150,6 +158,7 @@ private struct AddNetWorthAccountView: View {
                 }
             }
             .navigationTitle("New Account")
+            .compactFormLayout()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }

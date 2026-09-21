@@ -105,4 +105,50 @@ struct InsightsEngineTests {
         let expectedBalance: Decimal = 4300
         #expect(forecast.projectedEndOfMonthBalance == expectedBalance)
     }
+
+    @Test func categorySharesSumToOneAndSortDescending() {
+        let now = Date()
+        let food = ExpenseCategory(name: "Food", systemIconName: "fork.knife")
+        let travel = ExpenseCategory(name: "Travel", systemIconName: "airplane")
+        let transactions = [
+            makeTransaction(amount: 300, daysAgo: 1, category: food, now: now),
+            makeTransaction(amount: 100, daysAgo: 2, category: travel, now: now)
+        ]
+
+        let shares = InsightsEngine.categoryShares(transactions: transactions, forMonthContaining: now)
+        #expect(shares.count == 2)
+        #expect(shares.first?.categoryName == "Food")
+        #expect(shares.first?.systemIconName == "fork.knife")
+        let totalFraction = shares.reduce(0.0) { $0 + $1.fraction }
+        #expect(abs(totalFraction - 1.0) < 0.0001)
+        #expect(abs((shares.first?.fraction ?? 0) - 0.75) < 0.0001)
+    }
+
+    @Test func categorySharesEmptyWhenNoSpendThisMonth() {
+        let shares = InsightsEngine.categoryShares(transactions: [])
+        #expect(shares.isEmpty)
+    }
+
+    @Test func dailySpendThisMonthBucketsByCalendarDay() {
+        var comps = DateComponents()
+        comps.year = 2024
+        comps.month = 6
+        comps.day = 15
+        let calendar = Calendar.current
+        let now = calendar.date(from: comps)!
+
+        let sameDayLater = calendar.date(bySettingHour: 20, minute: 0, second: 0, of: now)!
+        let firstOfMonth = calendar.date(from: DateComponents(year: 2024, month: 6, day: 1))!
+
+        let transactions = [
+            ExpenseTransaction(amount: 40, date: now),
+            ExpenseTransaction(amount: 10, date: sameDayLater),
+            ExpenseTransaction(amount: 25, date: firstOfMonth)
+        ]
+
+        let daily = InsightsEngine.dailySpendThisMonth(transactions: transactions, calendar: calendar, now: now)
+        #expect(daily.count == 15) // June 1 through June 15
+        #expect(daily.first?.total == 25)
+        #expect(daily.last?.total == 50) // 40 + 10 on the 15th
+    }
 }

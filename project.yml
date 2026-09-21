@@ -43,10 +43,40 @@ targets:
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     dependencies:
       - package: MoneyIQCore
       - target: MoneyIQWidgets
         embed: true
+      - target: MoneyIQShareExtension
+        embed: true
+
+  MoneyIQShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: iOS/MoneyIQShareExtension
+    info:
+      path: iOS/MoneyIQShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Add to MoneyIQ
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.moneyiq.ios.shareextension
+        PRODUCT_NAME: MoneyIQShareExtension
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        SKIP_INSTALL: true
+        GENERATE_INFOPLIST_FILE: false
+    dependencies:
+      - package: MoneyIQCore
 
   MoneyIQWidgets:
     type: app-extension
@@ -103,6 +133,7 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"
         COMBINE_HIDPI_IMAGES: true
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     dependencies:
       - package: MoneyIQCore
 

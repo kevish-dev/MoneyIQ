@@ -40,6 +40,25 @@ public enum ReceiptParser {
         )
     }
 
+    /// Same heuristics as `parse(cgImage:)`, but for text handed off
+    /// directly — e.g. from a UPI app's native iOS share sheet (Share
+    /// Extension), which needs no OCR since the text is already real text,
+    /// not a picture of text.
+    public static func parse(text: String) -> ParsedReceipt {
+        let lines = text
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        return ParsedReceipt(
+            amount: extractAmount(from: lines),
+            merchantName: extractMerchant(from: lines),
+            date: extractDate(from: text),
+            looksLikeBill: detectBill(in: text),
+            rawText: text
+        )
+    }
+
     // MARK: - Amount
 
     private static let amountRegex = try! NSRegularExpression(
@@ -56,8 +75,23 @@ public enum ReceiptParser {
         pattern: #"([0-9]{1,3}(?:,[0-9]{2,3})*\.[0-9]{2})\b"#
     )
 
+    /// Many UPI apps' "Paid" line has no decimal at all (e.g. "Paid ·2,000"
+    /// for a round amount) — `moneyShapedRegex` requires a decimal, so it
+    /// misses these. This targets the word "paid"/"amount" specifically
+    /// (rather than matching any comma-grouped integer anywhere, which would
+    /// false-positive on reference numbers) and allows 0-3 characters
+    /// between it and the number, covering a misread ₹ glyph, a colon, or
+    /// plain whitespace.
+    private static let paidLineAmountRegex = try! NSRegularExpression(
+        pattern: #"(?:paid|amount)\D{0,3}([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{1,2})?)"#,
+        options: [.caseInsensitive]
+    )
+
     static func extractAmount(from lines: [String]) -> Decimal? {
         if let value = firstMatch(of: amountRegex, in: lines) {
+            return value
+        }
+        if let value = firstMatch(of: paidLineAmountRegex, in: lines) {
             return value
         }
         return firstMatch(of: moneyShapedRegex, in: lines)

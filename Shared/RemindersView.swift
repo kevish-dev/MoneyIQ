@@ -79,6 +79,7 @@ struct RemindersView: View {
             }
         }
         .navigationTitle("Reminders")
+        .compactListLayout()
         .toolbar {
             ToolbarItem {
                 Button {
@@ -240,6 +241,7 @@ private struct AddReminderView: View {
                 )
             }
             .navigationTitle("New Reminder")
+            .compactFormLayout()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {

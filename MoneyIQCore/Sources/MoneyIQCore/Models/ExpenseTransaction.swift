@@ -20,6 +20,10 @@ public final class ExpenseTransaction {
     public var paymentMethod: PaymentMethod
     public var createdAt: Date
 
+    /// Set the first time this transaction is edited after creation; nil
+    /// until then. Drives the "edited" indicator in the transaction list.
+    public var editedAt: Date?
+
     /// Set when a screenshot/ML pipeline produced this transaction (Phase 3).
     /// Left false for manual entries.
     public var isAutoImported: Bool
@@ -40,7 +44,8 @@ public final class ExpenseTransaction {
         isAutoImported: Bool = false,
         isBillLike: Bool = false,
         category: ExpenseCategory? = nil,
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        editedAt: Date? = nil
     ) {
         self.id = id
         self.amount = amount
@@ -52,5 +57,6 @@ public final class ExpenseTransaction {
         self.isBillLike = isBillLike
         self.category = category
         self.createdAt = createdAt
+        self.editedAt = editedAt
     }
 }

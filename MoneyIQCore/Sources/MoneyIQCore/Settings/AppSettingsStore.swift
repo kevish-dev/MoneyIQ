@@ -13,6 +13,7 @@ public final class AppSettingsStore {
         static let weeklySummaryEnabled = "com.moneyiq.settings.weeklySummaryEnabled"
         static let weeklySummaryWeekday = "com.moneyiq.settings.weeklySummaryWeekday"
         static let weeklySummaryMinutesSinceMidnight = "com.moneyiq.settings.weeklySummaryMinutes"
+        static let budgetLiveActivityEnabled = "com.moneyiq.settings.budgetLiveActivityEnabled"
     }
 
     private let defaults: UserDefaults
@@ -50,11 +51,18 @@ public final class AppSettingsStore {
         }
     }
 
+    /// Off by default — showing budget status on the Lock Screen / Dynamic
+    /// Island is opt-in, not automatic just because a budget exists.
+    public var isBudgetLiveActivityEnabled: Bool {
+        didSet { defaults.set(isBudgetLiveActivityEnabled, forKey: Key.budgetLiveActivityEnabled) }
+    }
+
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.isAppLockEnabled = defaults.bool(forKey: Key.appLockEnabled)
         self.isDailyReminderEnabled = defaults.bool(forKey: Key.dailyReminderEnabled)
         self.isWeeklySummaryEnabled = defaults.bool(forKey: Key.weeklySummaryEnabled)
+        self.isBudgetLiveActivityEnabled = defaults.bool(forKey: Key.budgetLiveActivityEnabled)
 
         let dailyMinutes = defaults.object(forKey: Key.dailyReminderMinutesSinceMidnight) as? Int ?? (20 * 60)
         self.dailyReminderTime = DateComponents(hour: dailyMinutes / 60, minute: dailyMinutes % 60)

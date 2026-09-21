@@ -16,6 +16,24 @@ public enum InsightsEngine {
         public let total: Decimal
     }
 
+    /// A category's spend plus its share (0...1) of the period's total —
+    /// what drives the bubble chart's per-bubble size/fill.
+    public struct CategoryShare: Identifiable, Sendable {
+        public let id = UUID()
+        public let categoryName: String
+        public let systemIconName: String
+        public let total: Decimal
+        public let fraction: Double
+    }
+
+    /// A single day's total spend — the bucket granularity for the
+    /// interactive spend-over-time chart.
+    public struct DailySpend: Identifiable, Sendable {
+        public let id = UUID()
+        public let day: Date
+        public let total: Decimal
+    }
+
     public struct Anomaly {
         public let transaction: ExpenseTransaction
         public let categoryAverage: Decimal
@@ -89,6 +107,75 @@ public enum InsightsEngine {
         return totals
             .map { CategoryTotal(categoryName: $0.key, total: $0.value) }
             .sorted { $0.total > $1.total }
+    }
+
+    /// Each category's percentage share of total spend for a single month
+    /// (defaults to the current one) — the data the category bubble chart
+    /// renders, one bubble per category, sized/filled by `fraction`.
+    public static func categoryShares(
+        transactions: [ExpenseTransaction],
+        forMonthContaining date: Date = .now,
+        calendar: Calendar = .current
+    ) -> [CategoryShare] {
+        let monthStart = calendar.startOfMonth(for: date)
+        guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return [] }
+
+        struct Bucket { var total: Decimal = 0; var icon: String = "questionmark.circle" }
+        var buckets: [String: Bucket] = [:]
+        for transaction in transactions where transaction.date >= monthStart && transaction.date < monthEnd {
+            let name = transaction.category?.name ?? "Uncategorized"
+            var bucket = buckets[name] ?? Bucket()
+            bucket.total += transaction.amount
+            if let icon = transaction.category?.systemIconName {
+                bucket.icon = icon
+            }
+            buckets[name] = bucket
+        }
+
+        let grandTotal = buckets.values.reduce(Decimal(0)) { $0 + $1.total }
+        guard grandTotal > 0 else { return [] }
+
+        return buckets
+            .map { name, bucket in
+                CategoryShare(
+                    categoryName: name,
+                    systemIconName: bucket.icon,
+                    total: bucket.total,
+                    fraction: NSDecimalNumber(decimal: bucket.total / grandTotal).doubleValue
+                )
+            }
+            .sorted { $0.total > $1.total }
+    }
+
+    /// Total spend per calendar day from the start of the current month
+    /// through today — the bucket granularity for the interactive
+    /// spend-over-time chart.
+    public static func dailySpendThisMonth(
+        transactions: [ExpenseTransaction],
+        calendar: Calendar = .current,
+        now: Date = .now
+    ) -> [DailySpend] {
+        let monthStart = calendar.startOfMonth(for: now)
+        let today = calendar.startOfDay(for: now)
+        guard today >= monthStart else { return [] }
+
+        var buckets: [Date: Decimal] = [:]
+        var cursor = monthStart
+        while cursor <= today {
+            buckets[cursor] = 0
+            guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
+            cursor = next
+        }
+
+        for transaction in transactions {
+            let day = calendar.startOfDay(for: transaction.date)
+            guard day >= monthStart && day <= today else { continue }
+            buckets[day, default: 0] += transaction.amount
+        }
+
+        return buckets
+            .sorted { $0.key < $1.key }
+            .map { DailySpend(day: $0.key, total: $0.value) }
     }
 
     // MARK: - Anomaly detection

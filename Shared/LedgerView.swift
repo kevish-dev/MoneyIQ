@@ -17,23 +17,50 @@ struct LedgerView: View {
         authManager.currentAccount?.preferredCurrencyCode ?? "USD"
     }
 
+    private var overallSummary: (owedToYou: Decimal, youOwe: Decimal) {
+        var owedToYou = Decimal(0)
+        var youOwe = Decimal(0)
+        for contact in contacts {
+            let net = LedgerEngine.netBalance(for: contact.entries)
+            if net > 0 {
+                owedToYou += net
+            } else if net < 0 {
+                youOwe += -net
+            }
+        }
+        return (owedToYou, youOwe)
+    }
+
     var body: some View {
         NavigationStack {
             List {
                 if contacts.isEmpty {
                     emptyState
                 } else {
-                    ForEach(contacts) { contact in
-                        NavigationLink {
-                            LedgerContactDetailView(contact: contact, currencyCode: currencyCode)
-                        } label: {
-                            ContactRow(contact: contact, currencyCode: currencyCode)
+                    summaryHeader
+                        .listRowInsets(EdgeInsets(
+                            top: AppTheme.Spacing.small,
+                            leading: AppTheme.Spacing.large,
+                            bottom: AppTheme.Spacing.small,
+                            trailing: AppTheme.Spacing.large
+                        ))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+
+                    Section("People") {
+                        ForEach(contacts) { contact in
+                            NavigationLink {
+                                LedgerContactDetailView(contact: contact, currencyCode: currencyCode)
+                            } label: {
+                                ContactRow(contact: contact, currencyCode: currencyCode)
+                            }
                         }
+                        .onDelete(perform: delete)
                     }
-                    .onDelete(perform: delete)
                 }
             }
             .navigationTitle("Split")
+            .compactListLayout()
             .toolbar {
                 ToolbarItem {
                     Button {
@@ -47,6 +74,44 @@ struct LedgerView: View {
                 AddContactView()
             }
         }
+    }
+
+    private var summaryHeader: some View {
+        let net = overallSummary.owedToYou - overallSummary.youOwe
+        return VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
+            Text(net >= 0 ? "Overall, you're owed" : "Overall, you owe")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.75))
+            Text(abs(net), format: .currency(code: currencyCode))
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+
+            HStack(spacing: AppTheme.Spacing.medium) {
+                summaryChip(label: "Owed to you", amount: overallSummary.owedToYou, tint: .green)
+                summaryChip(label: "You owe", amount: overallSummary.youOwe, tint: .red)
+            }
+        }
+        .padding(AppTheme.Spacing.large)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
+        .shadow(color: AppTheme.emberRed.opacity(0.3), radius: 16, y: 10)
+    }
+
+    private func summaryChip(label: String, amount: Decimal, tint: Color) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(tint).frame(width: 7, height: 7)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label)
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.7))
+                Text(amount, format: .currency(code: currencyCode))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+            }
+        }
+        .padding(.horizontal, AppTheme.Spacing.medium)
+        .padding(.vertical, AppTheme.Spacing.small)
+        .background(AppTheme.pillBackgroundOnHero, in: Capsule())
     }
 
     private var emptyState: some View {
@@ -86,22 +151,26 @@ private struct ContactRow: View {
         HStack(spacing: 12) {
             Circle()
                 .fill(Color(hex: contact.colorHex))
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
                 .overlay {
                     Text(initials)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                 }
+                .shadow(color: Color(hex: contact.colorHex).opacity(0.35), radius: 6, y: 3)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(contact.name).font(.subheadline.weight(.medium))
-                Text(statusText)
-                    .font(.caption)
-                    .foregroundStyle(statusColor)
+                HStack(spacing: 4) {
+                    Circle().fill(statusColor).frame(width: 6, height: 6)
+                    Text(statusText)
+                        .font(.caption)
+                        .foregroundStyle(statusColor)
+                }
             }
             Spacer()
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, AppTheme.Spacing.xs)
     }
 
     private var initials: String {
@@ -139,6 +208,7 @@ private struct AddContactView: View {
                 TextField("Name", text: $name)
             }
             .navigationTitle("New Person")
+            .compactFormLayout()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {

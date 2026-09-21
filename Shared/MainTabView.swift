@@ -10,7 +10,7 @@ struct MainTabView: View {
     var body: some View {
         TabView {
             Tab("Home", systemImage: "house.fill") {
-                HomeView(authManager: authManager)
+                HomeView(authManager: authManager, settings: settings)
             }
             Tab("Split", systemImage: "person.2.fill") {
                 LedgerView(authManager: authManager)

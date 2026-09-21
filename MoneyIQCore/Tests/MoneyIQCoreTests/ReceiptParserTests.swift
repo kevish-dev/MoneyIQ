@@ -25,6 +25,15 @@ struct ReceiptParserTests {
         #expect(ReceiptParser.extractAmount(from: lines) == nil)
     }
 
+    /// A round-number "Paid" line with no decimal at all (e.g. Google Pay's
+    /// "Paid ₹2,000") — Vision often misreads the ₹ as a stray middle dot,
+    /// and there's no decimal for `moneyShapedRegex` to key off, so this
+    /// needs the "paid"-keyword-scoped fallback specifically.
+    @Test func extractsRoundAmountFromPaidLineWithMisreadCurrencySymbol() {
+        let lines = ["12:03 1", "•I LTE 21", "Paid ·2,000", "To Mal Ramjibhai", "28 Jul '26, 12:03 am"]
+        #expect(ReceiptParser.extractAmount(from: lines) == Decimal(2000))
+    }
+
     @Test func extractsMerchantAfterPaidToPrefix() {
         let lines = ["Payment successful", "Paid to Swiggy Bangalore", "₹450"]
         #expect(ReceiptParser.extractMerchant(from: lines) == "Swiggy Bangalore")
@@ -38,6 +47,15 @@ struct ReceiptParserTests {
     @Test func detectsBillKeywords() {
         #expect(ReceiptParser.detectBill(in: "Electricity Bill Payment\n₹1200") == true)
         #expect(ReceiptParser.detectBill(in: "Paid to Swiggy\n₹450") == false)
+    }
+
+    /// `parse(text:)` is the entry point for shared text (Share Extension),
+    /// not OCR — same heuristics, no Vision step.
+    @Test func parsesSharedTextTheSameWayAsOCRLines() {
+        let shared = "Payment successful\nPaid to Swiggy Bangalore\n₹450"
+        let result = ReceiptParser.parse(text: shared)
+        #expect(result.amount == Decimal(450))
+        #expect(result.merchantName == "Swiggy Bangalore")
     }
 
     @Test func normalizesMerchantKeysConsistently() {

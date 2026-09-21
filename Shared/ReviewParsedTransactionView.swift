@@ -91,6 +91,7 @@ struct ReviewParsedTransactionView: View {
             }
         }
         .navigationTitle("Review")
+        .compactFormLayout()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") { save() }

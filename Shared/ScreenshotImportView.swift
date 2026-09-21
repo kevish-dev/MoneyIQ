@@ -46,6 +46,7 @@ struct ScreenshotImportView: View {
                 }
             }
             .navigationTitle("Add from Screenshot")
+            .compactFormLayout()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

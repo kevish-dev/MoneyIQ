@@ -11,6 +11,7 @@ struct RootView: View {
     @State private var notificationScheduler = NotificationScheduler()
     @State private var lockManager: AppLockManager?
     @State private var showSplash = true
+    @State private var sharedReceiptText: String?
 
     var body: some View {
         Group {
@@ -49,6 +50,22 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 lockManager?.lockIfEnabled()
+            }
+        }
+        .onOpenURL { url in
+            guard url.scheme == "moneyiq", url.host == "import-share",
+                  let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  let text = components.queryItems?.first(where: { $0.name == "text" })?.value,
+                  !text.isEmpty
+            else { return }
+            sharedReceiptText = text
+        }
+        .sheet(isPresented: Binding(
+            get: { sharedReceiptText != nil },
+            set: { if !$0 { sharedReceiptText = nil } }
+        )) {
+            if let sharedReceiptText {
+                SharedReceiptImportView(sharedText: sharedReceiptText)
             }
         }
     }
