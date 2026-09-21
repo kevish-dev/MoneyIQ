@@ -22,7 +22,6 @@ struct HomeView: View {
     @State private var sortOption: TransactionSortOption = .dateDescending
     @State private var categoryFilter: ExpenseCategory?
     @State private var billsOnly = false
-    @State private var hasAppeared = false
     #if os(iOS)
     @State private var liveActivityManager = BudgetLiveActivityManager()
     #endif
@@ -70,214 +69,60 @@ struct HomeView: View {
         categoryFilter != nil || billsOnly
     }
 
-    /// Profile + filter icons, floating directly on the gradient (not in the
-    /// system nav bar) — the nav bar is hidden on Home so the hero card can
-    /// bleed behind the status bar/Dynamic Island; `.safeAreaPadding(.top)`
-    /// keeps this row itself clear of the notch even though its container
-    /// extends further up.
-    private var topBar: some View {
-        HStack {
-            ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
-            Spacer()
-            filterMenu
-        }
-        .safeAreaPadding(.top)
-        .padding(.top, AppTheme.Spacing.small)
-    }
-
-    private var filterMenu: some View {
-        Menu {
-            Picker("Sort", selection: $sortOption) {
-                ForEach(TransactionSortOption.allCases) { option in
-                    Text(option.rawValue).tag(option)
-                }
-            }
-
-            Menu("Category") {
-                Button {
-                    categoryFilter = nil
-                } label: {
-                    if categoryFilter == nil {
-                        Label("All categories", systemImage: "checkmark")
-                    } else {
-                        Text("All categories")
-                    }
-                }
-                ForEach(categories) { category in
-                    Button {
-                        categoryFilter = category
-                    } label: {
-                        if categoryFilter?.id == category.id {
-                            Label(category.name, systemImage: "checkmark")
-                        } else {
-                            Text(category.name)
-                        }
-                    }
-                }
-            }
-
-            Toggle(isOn: $billsOnly) {
-                Label("Bills only", systemImage: "doc.text")
-            }
-        } label: {
-            Image(systemName: isFiltering
-                ? "line.3.horizontal.decrease.circle.fill"
-                : "line.3.horizontal.decrease.circle")
-                .font(.title2)
-                .foregroundStyle(.white)
-                .padding(8)
-                .background(.white.opacity(0.18), in: Circle())
+    /// Extracted so the category filter Menu's button labels aren't
+    /// each an inline if/else — that was pushing the surrounding Menu
+    /// expression past the type-checker's time budget.
+    @ViewBuilder
+    private func categoryMenuLabel(name: String, isSelected: Bool) -> some View {
+        if isSelected {
+            Label(name, systemImage: "checkmark")
+        } else {
+            Text(name)
         }
     }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    ZStack(alignment: .top) {
-                        if let account = authManager.currentAccount {
-                            BudgetCardView(
-                                currencyCode: account.preferredCurrencyCode,
-                                fullBleedTop: true,
-                                onAddExpenseManually: { showingAddTransaction = true },
-                                onAddExpenseFromScreenshot: { showingScreenshotImport = true }
-                            )
-                        }
-                        topBar
-                    }
-                    .padding(.horizontal, AppTheme.Spacing.large)
-                    .padding(.bottom, AppTheme.Spacing.small)
-                    // Minimal load-in: the hero settles into place first...
-                    .opacity(hasAppeared ? 1 : 0)
-                    .offset(y: hasAppeared ? 0 : -10)
-                    .animation(.easeOut(duration: 0.4), value: hasAppeared)
-                    .scrollTransition { content, phase in
-                        content
-                            .opacity(phase.isIdentity ? 1 : 0.85)
-                            .scaleEffect(phase.isIdentity ? 1 : 0.97, anchor: .top)
-                    }
+            List {
+                if let account = authManager.currentAccount {
+                    // Not wrapped in a `Section` on purpose — an empty-header
+                    // Section here was rendering a thin divider line above
+                    // the budget card in plain list style.
+                    BudgetCardView(
+                        currencyCode: account.preferredCurrencyCode,
+                        onAddExpenseManually: { showingAddTransaction = true },
+                        onAddExpenseFromScreenshot: { showingScreenshotImport = true }
+                    )
+                    .listRowInsets(EdgeInsets(
+                        top: AppTheme.Spacing.small,
+                        leading: AppTheme.Spacing.large,
+                        bottom: AppTheme.Spacing.small,
+                        trailing: AppTheme.Spacing.large
+                    ))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                }
 
-                    VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                        // A custom field instead of `.searchable` on
-                        // purpose — `.searchable` reserves its own
-                        // always-visible slot right below the nav bar,
-                        // which blocked the hero card above from bleeding
-                        // behind the status bar/Dynamic Island.
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundStyle(.secondary)
-                            TextField("Search transactions", text: $searchText)
-                            if !searchText.isEmpty {
-                                Button {
-                                    searchText = ""
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, AppTheme.Spacing.medium)
-                        .padding(.vertical, AppTheme.Spacing.small)
-                        .background(.thinMaterial, in: Capsule())
-                        .padding(.top, AppTheme.Spacing.medium)
-
-                        Text("Recent transactions")
-                            .font(.subheadline.weight(.semibold))
+                Section("Recent transactions") {
+                    if transactions.isEmpty {
+                        Text("No transactions yet.")
                             .foregroundStyle(.secondary)
-                            .padding(.top, AppTheme.Spacing.xs)
-
-                        if transactions.isEmpty {
-                            Text("No transactions yet.")
-                                .foregroundStyle(.secondary)
-                        } else if displayedTransactions.isEmpty {
-                            Text("No transactions match your search/filters.")
-                                .foregroundStyle(.secondary)
-                        }
-
-                        ForEach(displayedTransactions) { transaction in
-                            HStack(spacing: 12) {
-                                IconBubble(systemName: transaction.category?.systemIconName ?? "creditcard")
-
-                                VStack(alignment: .leading, spacing: 3) {
-                                    HStack(spacing: 6) {
-                                        Text(transaction.merchantName ?? transaction.category?.name ?? "Uncategorized")
-                                            .font(.subheadline.weight(.medium))
-                                        if transaction.isAutoImported {
-                                            Image(systemName: "text.viewfinder")
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        if transaction.editedAt != nil {
-                                            Image(systemName: "pencil.circle.fill")
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        if transaction.isBillLike {
-                                            Text("Bill")
-                                                .font(.caption2.weight(.semibold))
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(AppTheme.accent.opacity(0.18), in: Capsule())
-                                                .foregroundStyle(AppTheme.accent)
-                                        }
-                                    }
-                                    Text(relativeTimeText(for: transaction.date))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    if let note = transaction.note {
-                                        Text(note).font(.caption).foregroundStyle(.secondary)
-                                    }
-                                }
-                                Spacer()
-                                Text("-\(transaction.amount, format: .currency(code: account?.preferredCurrencyCode ?? "USD"))")
-                                    .font(.subheadline.weight(.semibold))
-                            }
-                            .padding(.vertical, AppTheme.Spacing.small)
-                            .contentShape(Rectangle())
-                            // Hold-to-edit/delete instead of swipe — consistent
-                            // with Split and Goals, and more discoverable than
-                            // a hidden swipe gesture.
-                            .contextMenu {
-                                Button {
-                                    editingTransaction = transaction
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                Button(role: .destructive) {
-                                    deletingTransaction = transaction
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                            .scrollTransition { content, phase in
-                                content
-                                    .opacity(phase.isIdentity ? 1 : 0.5)
-                                    .scaleEffect(phase.isIdentity ? 1 : 0.98)
-                                    .offset(y: phase.isIdentity ? 0 : (phase.value < 0 ? -6 : 6))
-                            }
-                            if transaction.id != displayedTransactions.last?.id {
-                                Divider()
-                            }
-                        }
-                        .animation(.easeInOut(duration: 0.25), value: displayedTransactions.map(\.id))
+                    } else if displayedTransactions.isEmpty {
+                        Text("No transactions match your search/filters.")
+                            .foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal, AppTheme.Spacing.large)
-                    .padding(.bottom, AppTheme.Spacing.large)
-                    // ...then the transaction list settles in just after.
-                    .opacity(hasAppeared ? 1 : 0)
-                    .offset(y: hasAppeared ? 0 : 14)
-                    .animation(.easeOut(duration: 0.45).delay(0.1), value: hasAppeared)
+                    ForEach(displayedTransactions) { transaction in
+                        TransactionRow(
+                            transaction: transaction,
+                            currencyCode: account?.preferredCurrencyCode ?? "USD",
+                            onEdit: { editingTransaction = transaction },
+                            onDelete: { deletingTransaction = transaction }
+                        )
+                    }
                 }
             }
-            .scrollClipDisabled()
-            .onAppear {
-                hasAppeared = true
-            }
-            .navigationTitle("")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.hidden, for: .navigationBar)
-            #endif
+            .navigationTitle("MoneyIQ")
+            .compactListLayout()
             .alert(
                 "Delete Transaction?",
                 isPresented: Binding(
@@ -290,6 +135,48 @@ struct HomeView: View {
                 Button("Cancel", role: .cancel) {}
             } message: { _ in
                 Text("This can't be undone.")
+            }
+            .searchable(text: $searchText, prompt: "Search transactions")
+            // The toolbar "Add" menu was removed — there's now a single
+            // entry point for starting a new transaction: the "Add Expense"
+            // button on the budget card, which itself presents the same
+            // "Enter Manually" / "From Screenshot" choice as a menu.
+            .toolbar {
+                ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
+                    ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
+                }
+                ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
+                    Menu {
+                        Picker("Sort", selection: $sortOption) {
+                            ForEach(TransactionSortOption.allCases) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+
+                        Menu("Category") {
+                            Button {
+                                categoryFilter = nil
+                            } label: {
+                                categoryMenuLabel(name: "All categories", isSelected: categoryFilter == nil)
+                            }
+                            ForEach(categories) { category in
+                                Button {
+                                    categoryFilter = category
+                                } label: {
+                                    categoryMenuLabel(name: category.name, isSelected: categoryFilter?.id == category.id)
+                                }
+                            }
+                        }
+
+                        Toggle(isOn: $billsOnly) {
+                            Label("Bills only", systemImage: "doc.text")
+                        }
+                    } label: {
+                        Image(systemName: isFiltering
+                            ? "line.3.horizontal.decrease.circle.fill"
+                            : "line.3.horizontal.decrease.circle")
+                    }
+                }
             }
             .sheet(item: $editingTransaction) { transaction in
                 EditTransactionView(transaction: transaction, categories: categories)
@@ -361,9 +248,78 @@ struct HomeView: View {
         }
     }
 
+}
+
+/// Pulled out of `HomeView.body` as its own view — the whole List was one
+/// enormous expression that the type-checker choked on ("unable to
+/// type-check this expression in reasonable time"); a real view struct
+/// avoids feeding it as one inline closure.
+private struct TransactionRow: View {
+    let transaction: ExpenseTransaction
+    let currencyCode: String
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            IconBubble(systemName: transaction.category?.systemIconName ?? "creditcard")
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(transaction.merchantName ?? transaction.category?.name ?? "Uncategorized")
+                        .font(.subheadline.weight(.medium))
+                    if transaction.isAutoImported {
+                        Image(systemName: "text.viewfinder")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    if transaction.editedAt != nil {
+                        Image(systemName: "pencil.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    if transaction.isBillLike {
+                        Text("Bill")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(AppTheme.accent.opacity(0.18), in: Capsule())
+                            .foregroundStyle(AppTheme.accent)
+                    }
+                }
+                Text(relativeTimeText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let note = transaction.note {
+                    Text(note).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Text(amountText)
+                .font(.subheadline.weight(.semibold))
+        }
+        .padding(.vertical, AppTheme.Spacing.small)
+        .contentShape(Rectangle())
+        // Hold-to-edit/delete instead of swipe — consistent with Split and
+        // Goals, and more discoverable than a hidden swipe gesture.
+        .contextMenu {
+            Button(action: onEdit) {
+                Label("Edit", systemImage: "pencil")
+            }
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    private var amountText: String {
+        "-" + transaction.amount.formatted(.currency(code: currencyCode))
+    }
+
     /// "Today, 9:42 AM" for today's transactions, otherwise a short date —
     /// matches the design reference's transaction-row timestamp style.
-    private func relativeTimeText(for date: Date) -> String {
+    private var relativeTimeText: String {
+        let date = transaction.date
         if Calendar.current.isDateInToday(date) {
             return "Today, \(date.formatted(.dateTime.hour().minute()))"
         } else if Calendar.current.isDateInYesterday(date) {
