@@ -11,6 +11,7 @@ struct LedgerContactDetailView: View {
     @State private var settlementDraft: SettlementDraft?
     @State private var editingEntry: LedgerEntry?
     @State private var showingRename = false
+    @State private var deletingEntry: LedgerEntry?
 
     private var sortedEntries: [LedgerEntry] {
         contact.entries.sorted { $0.date > $1.date }
@@ -43,18 +44,18 @@ struct LedgerContactDetailView: View {
                 }
                 ForEach(sortedEntries) { entry in
                     EntryRow(entry: entry, currencyCode: currencyCode)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                delete(entry)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+                        .contentShape(Rectangle())
+                        .contextMenu {
                             Button {
                                 editingEntry = entry
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
-                            .tint(AppTheme.accent)
+                            Button(role: .destructive) {
+                                deletingEntry = entry
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                 }
             }
@@ -69,6 +70,19 @@ struct LedgerContactDetailView: View {
                     Label("Rename", systemImage: "pencil")
                 }
             }
+        }
+        .alert(
+            "Delete Transaction?",
+            isPresented: Binding(
+                get: { deletingEntry != nil },
+                set: { if !$0 { deletingEntry = nil } }
+            ),
+            presenting: deletingEntry
+        ) { entry in
+            Button("Delete", role: .destructive) { delete(entry) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("This can't be undone.")
         }
         .sheet(isPresented: $showingAddEntry) {
             AddLedgerEntryView(contact: contact, currencyCode: currencyCode, isSettlement: false)
@@ -400,7 +414,7 @@ private struct EditLedgerEntryView: View {
     }
 }
 
-private struct RenameContactView: View {
+struct RenameContactView: View {
     @Bindable var contact: LedgerContact
 
     @Environment(\.modelContext) private var modelContext

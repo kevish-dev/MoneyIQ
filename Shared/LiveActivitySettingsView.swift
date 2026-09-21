@@ -52,7 +52,7 @@ struct LiveActivitySettingsView: View {
 
     @ToolbarContentBuilder
     private var profileToolbarItem: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
+        ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
             ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
         }
     }

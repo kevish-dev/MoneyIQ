@@ -13,6 +13,7 @@ struct RemindersView: View {
     @State private var showingAddReminder = false
     @State private var prefill: ReminderDraft?
     @State private var permissionDeniedAlert = false
+    @State private var remindersPendingDelete: [ReminderItem]?
 
     private var currencyCode: String {
         authManager.currentAccount?.preferredCurrencyCode ?? "USD"
@@ -73,7 +74,9 @@ struct RemindersView: View {
                         onToggle: { toggle(reminder) }
                     )
                 }
-                .onDelete(perform: delete)
+                .onDelete { offsets in
+                    remindersPendingDelete = offsets.map { reminders[$0] }
+                }
             } header: {
                 Text("Your Reminders")
             }
@@ -96,6 +99,24 @@ struct RemindersView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Turn on notifications for MoneyIQ in Settings to get reminder alerts.")
+        }
+        .alert(
+            "Delete \(remindersPendingDelete?.count == 1 ? (remindersPendingDelete?.first?.title ?? "Reminder") : "\(remindersPendingDelete?.count ?? 0) Reminders")?",
+            isPresented: Binding(
+                get: { remindersPendingDelete != nil },
+                set: { if !$0 { remindersPendingDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                for reminder in remindersPendingDelete ?? [] {
+                    notifications.cancelReminder(reminder)
+                    modelContext.delete(reminder)
+                }
+                try? modelContext.save()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This can't be undone.")
         }
     }
 
@@ -139,14 +160,6 @@ struct RemindersView: View {
         }
     }
 
-    private func delete(at offsets: IndexSet) {
-        for index in offsets {
-            let reminder = reminders[index]
-            notifications.cancelReminder(reminder)
-            modelContext.delete(reminder)
-        }
-        try? modelContext.save()
-    }
 }
 
 private struct ReminderRow: View {

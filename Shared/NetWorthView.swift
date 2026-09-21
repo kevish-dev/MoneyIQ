@@ -9,6 +9,7 @@ struct NetWorthView: View {
     @Query(sort: \NetWorthAccount.createdAt) private var accounts: [NetWorthAccount]
 
     @State private var showingAddAccount = false
+    @State private var accountsPendingDelete: [NetWorthAccount]?
 
     private var currencyCode: String {
         authManager.currentAccount?.preferredCurrencyCode ?? "USD"
@@ -45,7 +46,9 @@ struct NetWorthView: View {
                     ForEach(assets) { account in
                         accountRow(account)
                     }
-                    .onDelete { delete(assets, at: $0) }
+                    .onDelete { offsets in
+                        accountsPendingDelete = offsets.map { assets[$0] }
+                    }
                 }
             }
 
@@ -54,7 +57,9 @@ struct NetWorthView: View {
                     ForEach(liabilities) { account in
                         accountRow(account)
                     }
-                    .onDelete { delete(liabilities, at: $0) }
+                    .onDelete { offsets in
+                        accountsPendingDelete = offsets.map { liabilities[$0] }
+                    }
                 }
             }
 
@@ -76,6 +81,23 @@ struct NetWorthView: View {
         .sheet(isPresented: $showingAddAccount) {
             AddNetWorthAccountView()
         }
+        .alert(
+            "Delete \(accountsPendingDelete?.count == 1 ? (accountsPendingDelete?.first?.name ?? "Account") : "\(accountsPendingDelete?.count ?? 0) Accounts")?",
+            isPresented: Binding(
+                get: { accountsPendingDelete != nil },
+                set: { if !$0 { accountsPendingDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                for account in accountsPendingDelete ?? [] {
+                    modelContext.delete(account)
+                }
+                try? modelContext.save()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This can't be undone.")
+        }
     }
 
     private func accountRow(_ account: NetWorthAccount) -> some View {
@@ -93,12 +115,6 @@ struct NetWorthView: View {
         .padding(.vertical, AppTheme.Spacing.small)
     }
 
-    private func delete(_ group: [NetWorthAccount], at offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(group[index])
-        }
-        try? modelContext.save()
-    }
 }
 
 private struct ContentUnavailableIfNeeded: View {

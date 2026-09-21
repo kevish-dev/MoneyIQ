@@ -155,6 +155,7 @@ private struct BudgetEditView: View {
 
     @State private var capText: String
     @State private var rolloverEnabled: Bool
+    @State private var showingDeleteConfirmation = false
 
     init(budget: Budget?, currencyCode: String) {
         self.budget = budget
@@ -182,7 +183,7 @@ private struct BudgetEditView: View {
 
                 if budget != nil {
                     Section {
-                        Button("Delete Budget", role: .destructive) { deleteBudget() }
+                        Button("Delete Budget", role: .destructive) { showingDeleteConfirmation = true }
                     }
                 }
             }
@@ -196,6 +197,12 @@ private struct BudgetEditView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
+            }
+            .alert("Delete Budget?", isPresented: $showingDeleteConfirmation) {
+                Button("Delete", role: .destructive) { deleteBudget() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This can't be undone. You'll need to set a new monthly budget from scratch.")
             }
         }
     }

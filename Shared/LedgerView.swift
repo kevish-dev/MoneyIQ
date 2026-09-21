@@ -15,6 +15,8 @@ struct LedgerView: View {
     @Query(sort: \LedgerContact.createdAt, order: .reverse) private var contacts: [LedgerContact]
 
     @State private var showingAddContact = false
+    @State private var renamingContact: LedgerContact?
+    @State private var contactsPendingDelete: [LedgerContact]?
 
     private var currencyCode: String {
         authManager.currentAccount?.preferredCurrencyCode ?? "USD"
@@ -57,15 +59,29 @@ struct LedgerView: View {
                             } label: {
                                 ContactRow(contact: contact, currencyCode: currencyCode)
                             }
+                            .contextMenu {
+                                Button {
+                                    renamingContact = contact
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) {
+                                    contactsPendingDelete = [contact]
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
-                        .onDelete(perform: delete)
+                        .onDelete { offsets in
+                            contactsPendingDelete = offsets.map { contacts[$0] }
+                        }
                     }
                 }
             }
             .navigationTitle("Split")
             .compactListLayout()
             .toolbar {
-                ToolbarItem(placement: .navigation) {
+                ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
                     ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
                 }
                 ToolbarItem {
@@ -78,6 +94,25 @@ struct LedgerView: View {
             }
             .sheet(isPresented: $showingAddContact) {
                 AddContactView()
+            }
+            .sheet(item: $renamingContact) { contact in
+                RenameContactView(contact: contact)
+            }
+            .alert(
+                "Delete \(contactsPendingDelete?.count == 1 ? (contactsPendingDelete?.first?.name ?? "Person") : "\(contactsPendingDelete?.count ?? 0) People")?",
+                isPresented: Binding(
+                    get: { contactsPendingDelete != nil },
+                    set: { if !$0 { contactsPendingDelete = nil } }
+                )
+            ) {
+                Button("Delete", role: .destructive) {
+                    for contact in contactsPendingDelete ?? [] {
+                        deleteContact(contact)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This also deletes their entire transaction history with you. This can't be undone.")
             }
         }
     }
@@ -137,11 +172,13 @@ struct LedgerView: View {
         .listRowBackground(Color.clear)
     }
 
-    private func delete(at offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(contacts[index])
+    private func deleteContact(_ contact: LedgerContact) {
+        modelContext.delete(contact)
+        do {
+            try modelContext.save()
+        } catch {
+            print("MoneyIQ: failed to delete contact: \(error)")
         }
-        try? modelContext.save()
     }
 }
 

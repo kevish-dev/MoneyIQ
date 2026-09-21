@@ -16,9 +16,57 @@ struct HomeView: View {
     @State private var showingAddTransaction = false
     @State private var showingScreenshotImport = false
     @State private var editingTransaction: ExpenseTransaction?
+    @State private var deletingTransaction: ExpenseTransaction?
+    @State private var searchText = ""
+    @State private var sortOption: TransactionSortOption = .dateDescending
+    @State private var categoryFilter: ExpenseCategory?
+    @State private var billsOnly = false
     #if os(iOS)
     @State private var liveActivityManager = BudgetLiveActivityManager()
     #endif
+
+    private enum TransactionSortOption: String, CaseIterable, Identifiable {
+        case dateDescending = "Newest first"
+        case dateAscending = "Oldest first"
+        case amountDescending = "Amount: high to low"
+        case amountAscending = "Amount: low to high"
+
+        var id: String { rawValue }
+    }
+
+    /// `transactions` (the raw `@Query`) filtered by search text/category/
+    /// bills-only, then sorted per `sortOption` — the `@Query`'s own sort
+    /// (newest first) is just the default before any of this is applied.
+    private var displayedTransactions: [ExpenseTransaction] {
+        var result = transactions
+
+        if let categoryFilter {
+            result = result.filter { $0.category?.id == categoryFilter.id }
+        }
+        if billsOnly {
+            result = result.filter { $0.isBillLike }
+        }
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty {
+            result = result.filter { transaction in
+                transaction.merchantName?.localizedCaseInsensitiveContains(query) == true
+                    || transaction.category?.name.localizedCaseInsensitiveContains(query) == true
+                    || transaction.note?.localizedCaseInsensitiveContains(query) == true
+            }
+        }
+
+        switch sortOption {
+        case .dateDescending: result.sort { $0.date > $1.date }
+        case .dateAscending: result.sort { $0.date < $1.date }
+        case .amountDescending: result.sort { $0.amount > $1.amount }
+        case .amountAscending: result.sort { $0.amount < $1.amount }
+        }
+        return result
+    }
+
+    private var isFiltering: Bool {
+        categoryFilter != nil || billsOnly
+    }
 
     var body: some View {
         NavigationStack {
@@ -46,8 +94,11 @@ struct HomeView: View {
                     if transactions.isEmpty {
                         Text("No transactions yet.")
                             .foregroundStyle(.secondary)
+                    } else if displayedTransactions.isEmpty {
+                        Text("No transactions match your search/filters.")
+                            .foregroundStyle(.secondary)
                     }
-                    ForEach(transactions) { transaction in
+                    ForEach(displayedTransactions) { transaction in
                         HStack(spacing: 12) {
                             IconBubble(systemName: transaction.category?.systemIconName ?? "creditcard")
 
@@ -86,37 +137,88 @@ struct HomeView: View {
                                 .font(.subheadline.weight(.semibold))
                         }
                         .padding(.vertical, AppTheme.Spacing.small)
-                        // No whole-row .onTapGesture here on purpose: a
-                        // full-row tap gesture competes with List's own
-                        // swipe-to-delete recognizer and was blocking swipe
-                        // actions entirely. Edit now lives only in the
-                        // swipe actions below (tap the row to edit isn't
-                        // available anymore — swipe left instead).
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                deleteTransaction(transaction)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+                        .contentShape(Rectangle())
+                        // Hold-to-edit/delete instead of swipe — consistent
+                        // with Split and Goals, and more discoverable than a
+                        // hidden swipe gesture.
+                        .contextMenu {
                             Button {
                                 editingTransaction = transaction
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
-                            .tint(AppTheme.accent)
+                            Button(role: .destructive) {
+                                deletingTransaction = transaction
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
                 }
             }
             .navigationTitle("MoneyIQ")
             .compactListLayout()
+            .alert(
+                "Delete Transaction?",
+                isPresented: Binding(
+                    get: { deletingTransaction != nil },
+                    set: { if !$0 { deletingTransaction = nil } }
+                ),
+                presenting: deletingTransaction
+            ) { transaction in
+                Button("Delete", role: .destructive) { deleteTransaction(transaction) }
+                Button("Cancel", role: .cancel) {}
+            } message: { _ in
+                Text("This can't be undone.")
+            }
+            .searchable(text: $searchText, prompt: "Search transactions")
             // The toolbar "Add" menu was removed — there's now a single
             // entry point for starting a new transaction: the "Add Expense"
             // button on the budget card, which itself presents the same
             // "Enter Manually" / "From Screenshot" choice as a menu.
             .toolbar {
-                ToolbarItem(placement: .navigation) {
+                ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
                     ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
+                }
+                ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
+                    Menu {
+                        Picker("Sort", selection: $sortOption) {
+                            ForEach(TransactionSortOption.allCases) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+
+                        Menu("Category") {
+                            Button {
+                                categoryFilter = nil
+                            } label: {
+                                if categoryFilter == nil {
+                                    Label("All categories", systemImage: "checkmark")
+                                } else {
+                                    Text("All categories")
+                                }
+                            }
+                            ForEach(categories) { category in
+                                Button {
+                                    categoryFilter = category
+                                } label: {
+                                    if categoryFilter?.id == category.id {
+                                        Label(category.name, systemImage: "checkmark")
+                                    } else {
+                                        Text(category.name)
+                                    }
+                                }
+                            }
+                        }
+
+                        Toggle(isOn: $billsOnly) {
+                            Label("Bills only", systemImage: "doc.text")
+                        }
+                    } label: {
+                        Image(systemName: isFiltering
+                            ? "line.3.horizontal.decrease.circle.fill"
+                            : "line.3.horizontal.decrease.circle")
+                    }
                 }
             }
             .sheet(item: $editingTransaction) { transaction in

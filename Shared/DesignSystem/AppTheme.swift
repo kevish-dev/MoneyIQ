@@ -8,6 +8,17 @@ import SwiftUI
 /// automatically) plus the darker gradient stops used for hero cards that
 /// need an explicit `Color`/`LinearGradient` value.
 enum AppTheme {
+    /// The trailing (right-side) toolbar slot — `.topBarTrailing` is
+    /// iOS-only, so this picks the closest macOS equivalent instead of
+    /// failing to compile there. Used for the top-right profile icon.
+    static var trailingToolbarPlacement: ToolbarItemPlacement {
+        #if os(iOS)
+        .topBarTrailing
+        #else
+        .primaryAction
+        #endif
+    }
+
     /// Bright orange accent — same value as Assets.xcassets/AccentColor.
     /// Kept as an explicit token too, for call sites that need a `Color`
     /// before the view's environment resolves `.accentColor` (e.g. gradient

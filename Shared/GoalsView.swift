@@ -12,6 +12,7 @@ struct GoalsView: View {
     @Query(sort: \SavingsGoal.targetDate) private var goals: [SavingsGoal]
 
     @State private var showingAddGoal = false
+    @State private var goalsPendingDelete: [SavingsGoal]?
 
     private var currencyCode: String {
         authManager.currentAccount?.preferredCurrencyCode ?? "USD"
@@ -30,13 +31,15 @@ struct GoalsView: View {
                             GoalRow(goal: goal, currencyCode: currencyCode)
                         }
                     }
-                    .onDelete(perform: delete)
+                    .onDelete { offsets in
+                        goalsPendingDelete = offsets.map { goals[$0] }
+                    }
                 }
             }
             .navigationTitle("Goals")
             .compactListLayout()
             .toolbar {
-                ToolbarItem(placement: .navigation) {
+                ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
                     ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
                 }
                 ToolbarItem {
@@ -49,6 +52,23 @@ struct GoalsView: View {
             }
             .sheet(isPresented: $showingAddGoal) {
                 AddGoalView(currencyCode: currencyCode)
+            }
+            .alert(
+                "Delete \(goalsPendingDelete?.count == 1 ? (goalsPendingDelete?.first?.name ?? "Goal") : "\(goalsPendingDelete?.count ?? 0) Goals")?",
+                isPresented: Binding(
+                    get: { goalsPendingDelete != nil },
+                    set: { if !$0 { goalsPendingDelete = nil } }
+                )
+            ) {
+                Button("Delete", role: .destructive) {
+                    for goal in goalsPendingDelete ?? [] {
+                        modelContext.delete(goal)
+                    }
+                    try? modelContext.save()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This also deletes all its contributions. This can't be undone.")
             }
         }
     }
@@ -70,12 +90,6 @@ struct GoalsView: View {
         .listRowBackground(Color.clear)
     }
 
-    private func delete(at offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(goals[index])
-        }
-        try? modelContext.save()
-    }
 }
 
 private struct GoalRow: View {
@@ -112,6 +126,7 @@ private struct GoalDetailView: View {
     @State private var showingContribute = false
     @State private var showingEditGoal = false
     @State private var editingContribution: SavingsContribution?
+    @State private var deletingContribution: SavingsContribution?
 
     var body: some View {
         List {
@@ -153,18 +168,18 @@ private struct GoalDetailView: View {
                         Spacer()
                         Text(contribution.amount, format: .currency(code: currencyCode))
                     }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            delete(contribution)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
+                    .contentShape(Rectangle())
+                    .contextMenu {
                         Button {
                             editingContribution = contribution
                         } label: {
                             Label("Edit", systemImage: "pencil")
                         }
-                        .tint(AppTheme.accent)
+                        Button(role: .destructive) {
+                            deletingContribution = contribution
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
             }
@@ -195,6 +210,19 @@ private struct GoalDetailView: View {
         }
         .sheet(item: $editingContribution) { contribution in
             EditContributionView(goal: goal, contribution: contribution)
+        }
+        .alert(
+            "Delete Contribution?",
+            isPresented: Binding(
+                get: { deletingContribution != nil },
+                set: { if !$0 { deletingContribution = nil } }
+            ),
+            presenting: deletingContribution
+        ) { contribution in
+            Button("Delete", role: .destructive) { delete(contribution) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("This can't be undone.")
         }
     }
 
@@ -340,6 +368,7 @@ private struct EditGoalView: View {
     @State private var targetText: String
     @State private var targetDate: Date
     @State private var icon: String
+    @State private var showingDeleteConfirmation = false
 
     private let iconChoices = ["target", "airplane", "house", "car", "graduationcap", "heart", "gift"]
 
@@ -373,7 +402,7 @@ private struct EditGoalView: View {
                 }
 
                 Section {
-                    Button("Delete Goal", role: .destructive) { deleteGoal() }
+                    Button("Delete Goal", role: .destructive) { showingDeleteConfirmation = true }
                 }
             }
             .navigationTitle("Edit Goal")
@@ -386,6 +415,12 @@ private struct EditGoalView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
+            }
+            .alert("Delete Goal?", isPresented: $showingDeleteConfirmation) {
+                Button("Delete", role: .destructive) { deleteGoal() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This also deletes all its contributions. This can't be undone.")
             }
         }
     }
