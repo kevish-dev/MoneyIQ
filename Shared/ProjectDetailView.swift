@@ -10,6 +10,7 @@ struct ProjectDetailView: View {
 
     @State private var showingAddInstallment = false
     @State private var editingInstallment: PaymentInstallment?
+    @State private var receivedDateEditTarget: PaymentInstallment?
     @State private var deletingInstallment: PaymentInstallment?
     @State private var showingAddReimbursement = false
     @State private var editingReimbursement: ProjectReimbursement?
@@ -59,12 +60,18 @@ struct ProjectDetailView: View {
                 ForEach(installments) { installment in
                     InstallmentRow(installment: installment, currencyCode: currencyCode)
                         .contentShape(Rectangle())
-                        .onTapGesture { toggleReceived(installment) }
+                        // Tapping opens a small sheet to set/edit exactly
+                        // which date it was received on, rather than
+                        // silently stamping "today" — see
+                        // `InstallmentReceivedView`.
+                        .onTapGesture { receivedDateEditTarget = installment }
                         .contextMenu {
-                            Button {
-                                toggleReceived(installment)
-                            } label: {
-                                Label(installment.isReceived ? "Mark Pending" : "Mark Received", systemImage: installment.isReceived ? "arrow.uturn.backward" : "checkmark.circle")
+                            if installment.isReceived {
+                                Button {
+                                    toggleReceived(installment)
+                                } label: {
+                                    Label("Mark Pending", systemImage: "arrow.uturn.backward")
+                                }
                             }
                             Button {
                                 editingInstallment = installment
@@ -151,6 +158,9 @@ struct ProjectDetailView: View {
         }
         .sheet(item: $editingInstallment) { installment in
             EditInstallmentView(project: project, installment: installment)
+        }
+        .sheet(item: $receivedDateEditTarget) { installment in
+            InstallmentReceivedView(installment: installment)
         }
         .sheet(isPresented: $showingAddReimbursement) {
             AddReimbursementView(project: project)
@@ -511,6 +521,71 @@ private struct EditInstallmentView: View {
 private enum InstallmentEntryMode {
     case percentage
     case fixedAmount
+}
+
+/// Shown when tapping an installment row — marks it received (or, if
+/// already received, lets the date be corrected) on a date the user picks
+/// rather than always silently stamping "today."
+private struct InstallmentReceivedView: View {
+    @Bindable var installment: PaymentInstallment
+
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var receivedDate: Date
+
+    init(installment: PaymentInstallment) {
+        self.installment = installment
+        _receivedDate = State(initialValue: installment.receivedDate ?? .now)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    LabeledContent(installment.label, value: installment.amount.formatted(.currency(code: installment.project?.currencyCode ?? "USD")))
+                    DatePicker("Received on", selection: $receivedDate, displayedComponents: .date)
+                }
+
+                if installment.isReceived {
+                    Section {
+                        Button("Mark as Pending", role: .destructive) { markPending() }
+                    }
+                }
+            }
+            .navigationTitle(installment.isReceived ? "Edit Received Date" : "Mark Received")
+            .compactFormLayout()
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { markReceived() }
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func markReceived() {
+        installment.isReceived = true
+        installment.receivedDate = receivedDate
+        save()
+    }
+
+    private func markPending() {
+        installment.isReceived = false
+        installment.receivedDate = nil
+        save()
+    }
+
+    private func save() {
+        do {
+            try modelContext.save()
+        } catch {
+            print("MoneyIQ: failed to save installment received date: \(error)")
+        }
+        dismiss()
+    }
 }
 
 // MARK: - Reimbursements
