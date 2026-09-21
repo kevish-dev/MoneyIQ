@@ -16,6 +16,14 @@ public final class UserAccount {
     public var monthlyIncome: Decimal?
     public var createdAt: Date
 
+    /// At most one of these is meaningfully set at a time — a photo takes
+    /// priority over an emoji, which takes priority over the initials
+    /// fallback (see `AvatarView`). Kept as two separate optionals rather
+    /// than an enum since SwiftData models can't easily store enums with
+    /// associated `Data`/`String` payloads.
+    public var avatarImageData: Data? = nil
+    public var avatarEmoji: String? = nil
+
     @Relationship(deleteRule: .cascade, inverse: \LinkedIdentity.account)
     public var linkedIdentities: [LinkedIdentity] = []
 
