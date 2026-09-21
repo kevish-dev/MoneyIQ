@@ -22,6 +22,7 @@ struct HomeView: View {
     @State private var sortOption: TransactionSortOption = .dateDescending
     @State private var categoryFilter: ExpenseCategory?
     @State private var billsOnly = false
+    @State private var hasAppeared = false
     #if os(iOS)
     @State private var liveActivityManager = BudgetLiveActivityManager()
     #endif
@@ -146,6 +147,15 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, AppTheme.Spacing.large)
                     .padding(.bottom, AppTheme.Spacing.small)
+                    // Minimal load-in: the hero settles into place first...
+                    .opacity(hasAppeared ? 1 : 0)
+                    .offset(y: hasAppeared ? 0 : -10)
+                    .animation(.easeOut(duration: 0.4), value: hasAppeared)
+                    .scrollTransition { content, phase in
+                        content
+                            .opacity(phase.isIdentity ? 1 : 0.85)
+                            .scaleEffect(phase.isIdentity ? 1 : 0.97, anchor: .top)
+                    }
 
                     VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
                         // A custom field instead of `.searchable` on
@@ -239,16 +249,30 @@ struct HomeView: View {
                                     Label("Delete", systemImage: "trash")
                                 }
                             }
+                            .scrollTransition { content, phase in
+                                content
+                                    .opacity(phase.isIdentity ? 1 : 0.5)
+                                    .scaleEffect(phase.isIdentity ? 1 : 0.98)
+                                    .offset(y: phase.isIdentity ? 0 : (phase.value < 0 ? -6 : 6))
+                            }
                             if transaction.id != displayedTransactions.last?.id {
                                 Divider()
                             }
                         }
+                        .animation(.easeInOut(duration: 0.25), value: displayedTransactions.map(\.id))
                     }
                     .padding(.horizontal, AppTheme.Spacing.large)
                     .padding(.bottom, AppTheme.Spacing.large)
+                    // ...then the transaction list settles in just after.
+                    .opacity(hasAppeared ? 1 : 0)
+                    .offset(y: hasAppeared ? 0 : 14)
+                    .animation(.easeOut(duration: 0.45).delay(0.1), value: hasAppeared)
                 }
             }
             .scrollClipDisabled()
+            .onAppear {
+                hasAppeared = true
+            }
             .navigationTitle("")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
