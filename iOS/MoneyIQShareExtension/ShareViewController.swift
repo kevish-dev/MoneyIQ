@@ -1,161 +1,113 @@
 import UIKit
+import SwiftUI
 import UniformTypeIdentifiers
 import MoneyIQCore
 
-/// A headless Share Extension: no App Groups entitlement (paid-account
-/// gated, see AGENTS.md), so this never touches MoneyIQ's SwiftData store
-/// directly — it can't, running in its own sandboxed process. Instead it
-/// extracts whatever the source app shared — plain text (Google Pay,
-/// PhonePe, ...) or, just as commonly, a rendered receipt IMAGE (Slice and
-/// others render a shareable card rather than sharing text at all) — OCRs
-/// images with the same Vision pipeline used for screenshot import, and
-/// hands the resulting text to the main app both via the clipboard (a
-/// guaranteed-reliable path) and, best-effort, via the `moneyiq://` URL
-/// scheme. See `RootView.onOpenURL`, `SharedReceiptImportView`, and
-/// `HomeView`'s "Paste from Clipboard".
+/// Share Extension entry point: shows what it found in the shared content
+/// (see `SharedContentExtractor`) and, on "Add to MoneyIQ", hands it to the
+/// main app for review. The extension can't write MoneyIQ's SwiftData store
+/// itself (separate sandbox, no App Group), so the handoff goes through
+/// `ShareImportInbox`, which the app drains whenever it becomes active.
 final class ShareViewController: UIViewController {
-    /// Guards against `loadItem`/OCR simply never finishing for a given
-    /// source app. If nothing has finished within this window, bail out
-    /// and dismiss with a diagnostic instead of waiting on the system's own
-    /// (harsher, silent) timeout. OCR itself can take a couple of seconds,
-    /// so this is longer than a plain-text-only wait would need.
-    private var didFinish = false
+    private let model = ShareImportModel()
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
-            self?.finish(with: "MoneyIQ: timed out waiting for the shared content to load.")
-        }
-        extractSharedText { [weak self] text in
-            self?.finish(with: text)
-        }
+
+        let host = UIHostingController(rootView: ShareImportView(
+            model: model,
+            onAdd: { [weak self] in self?.addToMoneyIQ() },
+            onClose: { [weak self] in self?.extensionContext?.completeRequest(returningItems: nil) }
+        ))
+        addChild(host)
+        host.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(host.view)
+        NSLayoutConstraint.activate([
+            host.view.topAnchor.constraint(equalTo: view.topAnchor),
+            host.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            host.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+        host.didMove(toParent: self)
+
+        let items = extensionContext?.inputItems.compactMap { $0 as? NSExtensionItem } ?? []
+        model.start(with: items)
     }
 
-    private func finish(with text: String?) {
-        guard !didFinish else { return }
-        didFinish = true
-        guard let text, !text.isEmpty else {
-            extensionContext?.completeRequest(returningItems: nil)
-            return
-        }
-        forward(text: text)
-    }
+    private func addToMoneyIQ() {
+        guard case .ready(let candidate) = model.stage else { return }
+        let pending = PendingShareImport(text: candidate.text)
+        ShareImportInbox.enqueue(pending)
+        model.stage = .opening
 
-    private func extractSharedText(completion: @escaping (String?) -> Void) {
-        guard let item = extensionContext?.inputItems.first as? NSExtensionItem,
-              let attachments = item.attachments, !attachments.isEmpty else {
-            completion("MoneyIQ: the share sheet gave this extension no shareable content at all.")
-            return
-        }
-
-        // Plain text (or the more general "text" conformance some apps use
-        // instead) first — cheapest and most direct when it's available.
-        let textTypeIdentifiers = [UTType.plainText.identifier, UTType.text.identifier]
-        if let (provider, typeIdentifier) = textTypeIdentifiers.lazy
-            .compactMap({ id in attachments.first(where: { $0.hasItemConformingToTypeIdentifier(id) }).map { ($0, id) } })
-            .first {
-            provider.loadItem(forTypeIdentifier: typeIdentifier, options: nil) { data, _ in
-                DispatchQueue.main.async {
-                    if let text = data as? String, !text.isEmpty {
-                        completion(text)
-                    } else {
-                        // Registered as text but didn't actually hand back
-                        // usable text — fall through to image/URL instead
-                        // of giving up.
-                        self.extractFromImageOrURL(attachments: attachments, completion: completion)
-                    }
-                }
+        openMoneyIQ(importID: pending.id, text: candidate.text) { [weak self] opened in
+            guard let self else { return }
+            if opened {
+                self.extensionContext?.completeRequest(returningItems: nil)
+            } else {
+                // Couldn't switch apps. The inbox still delivers it next time
+                // MoneyIQ opens; this is a last resort for "Paste from
+                // Clipboard", kept local and short-lived.
+                UIPasteboard.general.setItems(
+                    [[UTType.utf8PlainText.identifier: candidate.text]],
+                    options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(60 * 60)]
+                )
+                self.model.stage = .savedForLater
             }
-            return
         }
-
-        extractFromImageOrURL(attachments: attachments, completion: completion)
     }
 
-    /// Many UPI apps (Slice, and likely others) render a shareable receipt
-    /// as an IMAGE rather than sharing plain text — OCR it with the same
-    /// `ReceiptParser` Vision pipeline used for screenshot import, then
-    /// hand off the recognized text exactly like real shared text.
-    private func extractFromImageOrURL(attachments: [NSItemProvider], completion: @escaping (String?) -> Void) {
-        let imageType = UTType.image.identifier
-        if let provider = attachments.first(where: { $0.hasItemConformingToTypeIdentifier(imageType) }) {
-            provider.loadItem(forTypeIdentifier: imageType, options: nil) { data, error in
-                Task { @MainActor in
-                    guard let cgImage = Self.cgImage(from: data) else {
-                        completion("MoneyIQ: shared an image but couldn't read it (\(error?.localizedDescription ?? "unknown error")).")
-                        return
-                    }
-                    do {
-                        let parsed = try await ReceiptParser.parse(cgImage: cgImage)
-                        completion(parsed.rawText.isEmpty
-                            ? "MoneyIQ: scanned the shared image but found no text in it."
-                            : parsed.rawText)
-                    } catch {
-                        completion("MoneyIQ: scanning the shared image failed (\(error.localizedDescription)).")
-                    }
-                }
-            }
-            return
-        }
-
-        let urlType = UTType.url.identifier
-        if let provider = attachments.first(where: { $0.hasItemConformingToTypeIdentifier(urlType) }) {
-            provider.loadItem(forTypeIdentifier: urlType, options: nil) { data, _ in
-                DispatchQueue.main.async {
-                    completion((data as? URL)?.absoluteString)
-                }
-            }
-            return
-        }
-
-        // None of our expected types matched — rather than silently giving
-        // up (which left the clipboard empty and no way to tell why), copy
-        // the actual type identifiers the source app is offering.
-        let availableTypes = attachments.flatMap { $0.registeredTypeIdentifiers }
-        completion("MoneyIQ: couldn't find text or an image to import. This app shared these types: \(availableTypes.joined(separator: ", "))")
-    }
-
-    /// `loadItem` for an image UTI can hand back a `UIImage`, raw `Data`,
-    /// or (very commonly) a file `URL` to a temporary image file,
-    /// depending on how the source app registered its attachment — handle
-    /// all three.
-    private static func cgImage(from data: Any?) -> CGImage? {
-        if let image = data as? UIImage {
-            return image.cgImage
-        }
-        if let url = data as? URL, let imageData = try? Data(contentsOf: url) {
-            return UIImage(data: imageData)?.cgImage
-        }
-        if let imageData = data as? Data {
-            return UIImage(data: imageData)?.cgImage
-        }
-        return nil
-    }
-
-    private func forward(text: String) {
-        // Always copy to the clipboard first — this doesn't depend on the
-        // cross-process URL-open handoff below, which has been observed
-        // unreliable on-device for this extension type (share sheet closes
-        // with nothing happening, even with completeRequest/open ordering
-        // fixes). MoneyIQ's Add Expense menu has a "Paste from Clipboard"
-        // entry that reads this directly, so the feature still works end
-        // to end even if the automatic open() handoff never fires.
-        UIPasteboard.general.string = text
-
+    /// `NSExtensionContext.open(_:)` is documented as working only for Today
+    /// widgets, so a share extension instead asks the `UIApplication` at the
+    /// top of its own responder chain (its `open(_:options:)` isn't
+    /// extension-unavailable), falling back to the extension context.
+    private func openMoneyIQ(importID: UUID, text: String, completion: @escaping (Bool) -> Void) {
         var components = URLComponents()
         components.scheme = "moneyiq"
         components.host = "import-share"
-        components.queryItems = [URLQueryItem(name: "text", value: text)]
-
+        components.queryItems = [
+            URLQueryItem(name: "id", value: importID.uuidString),
+            URLQueryItem(name: "text", value: text)
+        ]
         guard let url = components.url else {
-            extensionContext?.completeRequest(returningItems: nil)
+            completion(false)
             return
         }
 
-        // Fire-and-forget on open (its completion handler doesn't reliably
-        // fire from this extension type) and dismiss immediately — the
-        // clipboard write above is what actually guarantees delivery.
-        extensionContext?.open(url, completionHandler: nil)
-        extensionContext?.completeRequest(returningItems: nil)
+        var finished = false
+        let finish: (Bool) -> Void = { opened in
+            DispatchQueue.main.async {
+                guard !finished else { return }
+                finished = true
+                completion(opened)
+            }
+        }
+        // Neither API promises to call back from an extension; don't leave
+        // the user on a spinner if they don't.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { finish(false) }
+
+        let openViaExtensionContext = { [weak self] in
+            guard let context = self?.extensionContext else {
+                finish(false)
+                return
+            }
+            context.open(url) { finish($0) }
+        }
+
+        var responder: UIResponder? = self
+        while let current = responder {
+            if let application = current as? UIApplication {
+                application.open(url, options: [:]) { opened in
+                    if opened {
+                        finish(true)
+                    } else {
+                        openViaExtensionContext()
+                    }
+                }
+                return
+            }
+            responder = current.next
+        }
+        openViaExtensionContext()
     }
 }

@@ -34,6 +34,70 @@ struct ReceiptParserTests {
         #expect(ReceiptParser.extractAmount(from: lines) == Decimal(2000))
     }
 
+    /// Exactly what Vision returns for the real Slice receipt card: the big
+    /// centered "₹100" comes back as "·100", with no "Paid" on that line and
+    /// no decimals, so none of the original patterns caught it and the
+    /// review screen opened with the amount blank (Save disabled).
+    @Test func extractsStandaloneRoundAmountWithMisreadCurrencySymbol() {
+        let lines = [
+            "PAID SECURELY ON", "slice", "PAYMENT SUCCESSFUL", "·100",
+            "To Big Mama Canfectionery", "Q899636744@ybl", "19 Sep '26, 05:52 pm",
+            "From slice CC", "xx6386", "RRN: 626224365150"
+        ]
+        #expect(ReceiptParser.extractAmount(from: lines) == Decimal(100))
+        #expect(ReceiptParser.extractMerchant(from: lines) == "Big Mama Canfectionery")
+    }
+
+    @Test func doesNotTruncateAmountsWithoutThousandsSeparators() {
+        #expect(ReceiptParser.extractAmount(from: ["Paid ₹1500 to Swiggy"]) == Decimal(1500))
+        #expect(ReceiptParser.extractAmount(from: ["Rs.12000 debited from A/c XX1234"]) == Decimal(12000))
+        #expect(ReceiptParser.extractAmount(from: ["Total 1500.00"]) == Decimal(string: "1500.00"))
+    }
+
+    @Test func handlesIndianDigitGrouping() {
+        #expect(ReceiptParser.extractAmount(from: ["₹1,00,000.50"]) == Decimal(string: "100000.50"))
+    }
+
+    @Test func treatsHryvniaSignAsAMisreadRupee() {
+        #expect(ReceiptParser.extractAmount(from: ["₴2,000.00"]) == Decimal(2000))
+    }
+
+    @Test func doesNotReadDatesPhoneNumbersOrWordsAsAmounts() {
+        #expect(ReceiptParser.extractAmount(from: ["Date 19.09.2026"]) == nil)
+        #expect(ReceiptParser.extractAmount(from: ["Working hours 5"]) == nil)
+        #expect(ReceiptParser.extractAmount(from: ["+919876543210"]) == nil)
+    }
+
+    @Test func parsesTheSlicePaymentSharedAsText() {
+        let result = ReceiptParser.parse(text: "PAYMENT SUCCESSFUL\n·100\nTo Big Mama Canfectionery\n19 Sep '26, 05:52 pm")
+        #expect(result.amount == Decimal(100))
+        #expect(result.merchantName == "Big Mama Canfectionery")
+        #expect(result.date != nil)
+    }
+
+    /// Real Vision output for a Slice "Paid ₹80" screenshot: the top reading
+    /// turned the ₹ into a 7, with the right reading ranked equally beside it.
+    @Test func prefersTheAlternativeReadingWhenTheRupeeWasReadAsADigit() {
+        let candidates: [(string: String, confidence: Float)] = [("Paid 780", 1), ("Paid ·80", 1), ("Paid 80", 1)]
+        #expect(ReceiptParser.bestReading(of: candidates) == "Paid ·80")
+    }
+
+    @Test func keepsTheTopReadingWithoutAnEquallyConfidentSymbolAlternative() {
+        #expect(ReceiptParser.bestReading(of: [("Paid 780", 1)]) == "Paid 780")
+        #expect(ReceiptParser.bestReading(of: [("Paid 780", 1), ("Paid ·80", 0.3)]) == "Paid 780")
+        #expect(ReceiptParser.bestReading(of: [("Total 1,250.00", 1), ("Total ·1,250.00", 1)]) == "Total 1,250.00")
+        #expect(ReceiptParser.bestReading(of: []) == nil)
+    }
+
+    /// A screenshot's first OCR line is usually the status-bar clock; that's
+    /// "now", not the payment's date, which appears further down.
+    @Test func skipsTheStatusBarClockWhenFindingTheDate() throws {
+        let date = try #require(ReceiptParser.extractDate(from: "11:21\nPaid ·2,000\nTo Mal Ramjibhai\n28 Jul '26, 12:03 am"))
+        let components = Calendar.current.dateComponents([.month, .day], from: date)
+        #expect(components.month == 7)
+        #expect(components.day == 28)
+    }
+
     @Test func extractsMerchantAfterPaidToPrefix() {
         let lines = ["Payment successful", "Paid to Swiggy Bangalore", "₹450"]
         #expect(ReceiptParser.extractMerchant(from: lines) == "Swiggy Bangalore")

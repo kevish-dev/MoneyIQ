@@ -86,9 +86,11 @@ exercises `PersistenceController` itself. Run them with:
 cd MoneyIQCore && xcrun --sdk macosx swift test
 ```
 
-32 tests as of the last commit, across `ReceiptParserTests`,
-`InsightsEngineTests`, `BudgetEngineTests`, `SavingsGoalTests`,
-`LedgerEngineTests`, `PersistenceControllerTests`. When you add a new pure
+78 tests as of the last commit, across `ReceiptParserTests`,
+`ReceiptImagePipelineTests`, `ShareImportInboxTests`, `InsightsEngineTests`,
+`BudgetEngineTests`, `SavingsGoalTests`, `LedgerEngineTests`,
+`FreelanceProjectEngineTests`, `BackupManagerTests`,
+`PersistenceControllerTests`. When you add a new pure
 logic function, add tests in this style — don't skip it because "the UI
 will catch it," since the UI in this app can't currently be clicked through
 reliably in CI/automation (see below).
@@ -117,6 +119,34 @@ If you're asked to build something the PRD marks as paid-gated, **verify
 empirically by actually building it** before assuming it's blocked. `xcodebuild`
 with a personal/free signing team either succeeds or fails with a specific,
 legible error — don't guess from the PRD table alone.
+
+### OCR: use `VNRecognizeTextRequest`, not the async `RecognizeTextRequest`
+
+The newer async `RecognizeTextRequest.perform(on:)` was observed suspending
+forever on this project's real receipt images (no CPU, no error, the
+continuation never resumed), while `VNRecognizeTextRequest` read the same
+images in under a second. `ReceiptParser` runs the latter on a background
+queue; `ReceiptImagePipelineTests` has a time-limited OCR test so a hang
+fails the suite instead of stalling it. Two related gotchas: decode images
+with `ReceiptImageLoader` (ImageIO), never `UIImage(data:)?.cgImage` — the
+latter drops EXIF orientation, so a portrait photo is OCR'd sideways — and
+don't resample screenshots: a 1% downscale flipped a real "Paid ₹80" to
+"Paid 780".
+
+### Share Extension → app handoff works without App Groups
+
+The extension can't write the app's SwiftData store, and
+`NSExtensionContext.open(_:)` is Today-widget-only, so a share would
+silently go nowhere. What works instead:
+
+- The extension opens MoneyIQ through the `UIApplication` at the top of its
+  own responder chain — `open(_:options:completionHandler:)` isn't marked
+  extension-unavailable in this SDK (only `sharedApplication` is).
+- It **also** always queues the share on a named `UIPasteboard`
+  (`ShareImportInbox`): private to the same signing team, persisted by the
+  system, no entitlement, no "Allow Paste" prompt. `RootView` drains it
+  whenever the app becomes active, so a share still arrives if the app
+  switch is ever blocked.
 
 ### Deployment target is iOS 26 / macOS 26, on purpose
 

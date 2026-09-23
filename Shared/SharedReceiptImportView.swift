@@ -2,12 +2,11 @@ import SwiftUI
 import SwiftData
 import MoneyIQCore
 
-/// Entry point for a transaction shared in from another app (Google Pay,
-/// PhonePe, Paytm, etc.) via iOS's native share sheet — `MoneyIQShareExtension`
-/// hands the shared text to the main app through the `moneyiq://import-share`
-/// URL (see `RootView.onOpenURL`), and this parses it with the same
-/// heuristics as screenshot import, then reuses the same review screen so
-/// nothing is saved until the user confirms it.
+/// Review screen for a payment brought in from another app — shared via the
+/// Share Extension (delivered through `ShareImportInbox` / the
+/// `moneyiq://import-share` URL, see `RootView`) or pasted from the
+/// clipboard. Parses the text with the same heuristics as screenshot
+/// import, and nothing is saved until the user confirms it.
 struct SharedReceiptImportView: View {
     let sharedText: String
 

@@ -120,7 +120,7 @@ struct ScreenshotImportView: View {
         stage = .parsing
         do {
             guard let data = try await item.loadTransferable(type: Data.self),
-                  let cgImage = CGImageFromData(data) else {
+                  let cgImage = ReceiptImageLoader.cgImage(from: data) else {
                 errorMessage = "That doesn't look like an image MoneyIQ can read."
                 stage = .failed
                 return
@@ -155,17 +155,3 @@ struct ScreenshotImportView: View {
         dismiss()
     }
 }
-
-#if os(iOS)
-import UIKit
-private func CGImageFromData(_ data: Data) -> CGImage? {
-    UIImage(data: data)?.cgImage
-}
-#elseif os(macOS)
-import AppKit
-private func CGImageFromData(_ data: Data) -> CGImage? {
-    guard let image = NSImage(data: data) else { return nil }
-    var rect = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
-    return image.cgImage(forProposedRect: &rect, context: nil, hints: nil)
-}
-#endif

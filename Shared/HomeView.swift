@@ -17,7 +17,8 @@ struct HomeView: View {
     @State private var showingAddTransaction = false
     @State private var showingScreenshotImport = false
     @State private var clipboardImportText: String?
-    @State private var clipboardEmptyAlert = false
+    @State private var isReadingClipboard = false
+    @State private var clipboardProblem: ClipboardProblem?
     @State private var editingTransaction: ExpenseTransaction?
     @State private var deletingTransaction: ExpenseTransaction?
     @State private var searchText = ""
@@ -198,10 +199,24 @@ struct HomeView: View {
                     SharedReceiptImportView(sharedText: clipboardImportText)
                 }
             }
-            .alert("Nothing to import", isPresented: $clipboardEmptyAlert) {
+            .alert(
+                clipboardProblem?.title ?? "",
+                isPresented: Binding(
+                    get: { clipboardProblem != nil },
+                    set: { if !$0 { clipboardProblem = nil } }
+                ),
+                presenting: clipboardProblem
+            ) { _ in
                 Button("OK", role: .cancel) {}
-            } message: {
-                Text("Copy or share a payment message/receipt from a UPI app first, then try again.")
+            } message: { problem in
+                Text(problem.message)
+            }
+            .overlay {
+                if isReadingClipboard {
+                    ProgressView("Reading clipboard…")
+                        .padding(AppTheme.Spacing.large)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppTheme.rowCornerRadius, style: .continuous))
+                }
             }
             #if os(iOS)
             // Keeps the Lock Screen / Dynamic Island Live Activity in sync
@@ -264,49 +279,51 @@ struct HomeView: View {
         }
     }
 
-    /// Reliable fallback for the share-extension handoff, which has been
-    /// observed to sometimes not switch to MoneyIQ at all — the extension
-    /// always copies the shared payment text to the clipboard regardless,
-    /// so this works even when that automatic handoff doesn't. Also covers
-    /// manually copying a receipt from a UPI app: several apps (Slice,
-    /// notably) put a rendered IMAGE on the clipboard rather than text when
-    /// you tap their own "Copy" button — this OCRs that image with the same
-    /// pipeline used for screenshot import, so either kind of clipboard
-    /// content works.
+    /// Imports a payment the user copied from a UPI app — text, or a
+    /// receipt image (see `ClipboardReceiptReader`), which takes a moment to
+    /// OCR, hence the progress overlay.
     private func pasteFromClipboard() {
-        if let text = clipboardString, !text.isEmpty {
-            clipboardImportText = text
-            return
-        }
-        #if os(iOS)
-        if let image = UIPasteboard.general.image, let cgImage = image.cgImage {
-            Task {
-                if let parsed = try? await ReceiptParser.parse(cgImage: cgImage), !parsed.rawText.isEmpty {
-                    clipboardImportText = parsed.rawText
-                } else {
-                    clipboardEmptyAlert = true
-                }
+        guard !isReadingClipboard else { return }
+        isReadingClipboard = true
+        Task {
+            let outcome = await ClipboardReceiptReader.read()
+            isReadingClipboard = false
+            switch outcome {
+            case .found(let text): clipboardImportText = text
+            case .empty: clipboardProblem = .empty
+            case .notAllowed: clipboardProblem = .notAllowed
+            case .noTextInImage: clipboardProblem = .noTextInImage
             }
-            return
         }
-        #endif
-        clipboardEmptyAlert = true
-    }
-
-    private var clipboardString: String? {
-        #if os(iOS)
-        UIPasteboard.general.string
-        #elseif os(macOS)
-        NSPasteboard.general.string(forType: .string)
-        #endif
     }
 }
 
-#if os(iOS)
-import UIKit
-#elseif os(macOS)
-import AppKit
-#endif
+private enum ClipboardProblem: Identifiable {
+    case empty
+    case notAllowed
+    case noTextInImage
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .empty: "Nothing to import"
+        case .notAllowed: "Paste wasn't allowed"
+        case .noTextInImage: "Couldn't read the image"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .empty:
+            "Copy a payment receipt or message from a UPI app first, then try again."
+        case .notAllowed:
+            "Tap \u{201C}Allow Paste\u{201D} when iOS asks. To stop being asked, go to Settings › Apps › MoneyIQ › Paste from Other Apps and choose Allow."
+        case .noTextInImage:
+            "The copied image didn't contain any readable text. Try copying the receipt again, or use Add Expense › From Screenshot."
+        }
+    }
+}
 
 /// Pulled out of `HomeView.body` as its own view — the whole List was one
 /// enormous expression that the type-checker choked on ("unable to

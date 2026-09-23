@@ -11,7 +11,18 @@ struct RootView: View {
     @State private var notificationScheduler = NotificationScheduler()
     @State private var lockManager: AppLockManager?
     @State private var showSplash = true
-    @State private var sharedReceiptText: String?
+
+    /// Payments shared in from other apps, waiting to be reviewed one at a
+    /// time. Fed by the `moneyiq://import-share` URL and by
+    /// `ShareImportInbox`, which also catches shares made while MoneyIQ
+    /// couldn't be opened directly.
+    @State private var importQueue: [PendingShareImport] = []
+    @State private var activeImport: PendingShareImport?
+    /// `activeImport` is already nil by the time the sheet's `onDismiss`
+    /// runs, so remember which one was showing.
+    @State private var presentedImportID: UUID?
+    @State private var handledImportIDs: Set<UUID> = []
+    @State private var suspendedImportForLock = false
 
     var body: some View {
         Group {
@@ -46,27 +57,88 @@ struct RootView: View {
             withAnimation(.easeInOut(duration: 0.4)) {
                 showSplash = false
             }
+            collectPendingImports()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 lockManager?.lockIfEnabled()
+                collectPendingImports()
+            }
+        }
+        .onChange(of: canPresentImports) { _, canPresent in
+            if canPresent {
+                presentNextImport()
+            } else if let active = activeImport {
+                // Locked mid-review: the sheet sits above the lock screen, so
+                // hide it — but keep the import queued for after unlock.
+                suspendedImportForLock = true
+                importQueue.insert(active, at: 0)
+                activeImport = nil
             }
         }
         .onOpenURL { url in
-            guard url.scheme == "moneyiq", url.host == "import-share",
-                  let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-                  let text = components.queryItems?.first(where: { $0.name == "text" })?.value,
-                  !text.isEmpty
-            else { return }
-            sharedReceiptText = text
-        }
-        .sheet(isPresented: Binding(
-            get: { sharedReceiptText != nil },
-            set: { if !$0 { sharedReceiptText = nil } }
-        )) {
-            if let sharedReceiptText {
-                SharedReceiptImportView(sharedText: sharedReceiptText)
+            guard url.scheme == "moneyiq", url.host == "import-share" else { return }
+            let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            let id = queryItems.first { $0.name == "id" }?.value.flatMap(UUID.init(uuidString:))
+            if let text = queryItems.first(where: { $0.name == "text" })?.value, !text.isEmpty {
+                enqueue(PendingShareImport(id: id ?? UUID(), text: text))
             }
+            collectPendingImports()
+        }
+        .sheet(item: $activeImport, onDismiss: importSheetDismissed) { pending in
+            SharedReceiptImportView(sharedText: pending.text)
+        }
+    }
+
+    /// Never over the lock screen, sign-in, or onboarding.
+    private var canPresentImports: Bool {
+        guard !showSplash, let lockManager, !lockManager.isLocked,
+              authManager?.currentAccount?.isOnboarded == true else { return false }
+        return true
+    }
+
+    private func collectPendingImports() {
+        #if os(iOS)
+        ShareImportInbox.pendingImports().forEach(enqueue)
+        #endif
+        presentNextImport()
+    }
+
+    private func enqueue(_ pending: PendingShareImport) {
+        guard !handledImportIDs.contains(pending.id),
+              activeImport?.id != pending.id,
+              !importQueue.contains(where: { $0.id == pending.id }) else { return }
+        importQueue.append(pending)
+    }
+
+    private func presentNextImport() {
+        guard activeImport == nil, canPresentImports, !importQueue.isEmpty else { return }
+        let next = importQueue.removeFirst()
+        presentedImportID = next.id
+        activeImport = next
+    }
+
+    /// Saved or cancelled, either way it's been dealt with — drop it from the
+    /// inbox so it doesn't come back, then move on to the next one. It stays
+    /// in the inbox until now so a share isn't lost if the app is killed
+    /// mid-review.
+    private func importSheetDismissed() {
+        guard !suspendedImportForLock else {
+            suspendedImportForLock = false
+            presentedImportID = nil
+            return
+        }
+        if let id = presentedImportID {
+            handledImportIDs.insert(id)
+            #if os(iOS)
+            ShareImportInbox.remove(id: id)
+            #endif
+            presentedImportID = nil
+        }
+        Task { @MainActor in
+            // Let the dismissal animation finish before presenting again.
+            try? await Task.sleep(for: .milliseconds(450))
+            presentNextImport()
         }
     }
 }
