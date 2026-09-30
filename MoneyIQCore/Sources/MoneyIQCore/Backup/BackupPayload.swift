@@ -121,9 +121,6 @@ public struct ExpenseTransactionDTO: Codable {
     public var categoryID: UUID?
     public var createdAt: Date
     public var editedAt: Date?
-    /// Optional so backups made before income existed still decode (as
-    /// expenses).
-    public var direction: TransactionDirection?
 }
 
 public struct BudgetDTO: Codable {

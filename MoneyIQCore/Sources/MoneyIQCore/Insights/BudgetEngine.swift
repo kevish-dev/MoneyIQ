@@ -23,7 +23,7 @@ public enum BudgetEngine {
     ) -> Decimal {
         let monthStart = calendar.startOfMonth(for: date)
         guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return 0 }
-        return transactions.expensesOnly
+        return transactions
             .filter { $0.date >= monthStart && $0.date < monthEnd }
             .reduce(Decimal(0)) { $0 + $1.amount }
     }

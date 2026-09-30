@@ -14,7 +14,7 @@ struct HomeView: View {
     @Query(sort: \Budget.createdAt, order: .reverse) private var budgets: [Budget]
     @Query(sort: \SavingsGoal.targetDate) private var goals: [SavingsGoal]
 
-    @State private var addingTransactionDirection: TransactionDirection?
+    @State private var showingAddTransaction = false
     @State private var showingScreenshotImport = false
     @State private var clipboardImportText: String?
     @State private var isReadingClipboard = false
@@ -45,11 +45,11 @@ struct HomeView: View {
         let calendar = Calendar.current
         let monthStart = calendar.startOfMonth(for: .now)
         guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return [] }
-        return transactions.expensesOnly.filter { $0.date >= monthStart && $0.date < monthEnd }
+        return transactions.filter { $0.date >= monthStart && $0.date < monthEnd }
     }
 
     /// `currentMonthTransactions` filtered by search text/category/
-    /// bills-only/direction, then sorted per `sortOption` — the `@Query`'s
+    /// bills-only, then sorted per `sortOption` — the `@Query`'s
     /// own sort (newest first) is just the default before any of this is
     /// applied.
     private var displayedTransactions: [ExpenseTransaction] {
@@ -108,8 +108,7 @@ struct HomeView: View {
                     // the budget card in plain list style.
                     BudgetCardView(
                         currencyCode: account.preferredCurrencyCode,
-                        onAddExpenseManually: { addingTransactionDirection = .expense },
-                        onAddIncomeManually: { addingTransactionDirection = .income },
+                        onAddExpenseManually: { showingAddTransaction = true },
                         onAddExpenseFromScreenshot: { showingScreenshotImport = true },
                         onAddExpenseFromClipboard: { pasteFromClipboard() }
                     )
@@ -203,8 +202,8 @@ struct HomeView: View {
             .sheet(item: $editingTransaction) { transaction in
                 EditTransactionView(transaction: transaction, categories: categories)
             }
-            .sheet(item: $addingTransactionDirection) { direction in
-                AddTransactionView(categories: categories, initialDirection: direction)
+            .sheet(isPresented: $showingAddTransaction) {
+                AddTransactionView(categories: categories)
             }
             .sheet(isPresented: $showingScreenshotImport) {
                 ScreenshotImportView(categories: categories)
@@ -355,9 +354,7 @@ private struct TransactionRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            IconBubble(systemName: transaction.isIncome
-                ? "arrow.down.left"
-                : transaction.category?.systemIconName ?? "creditcard")
+            IconBubble(systemName: transaction.category?.systemIconName ?? "creditcard")
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
@@ -392,7 +389,6 @@ private struct TransactionRow: View {
             Spacer()
             Text(amountText)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(transaction.isIncome ? Color.green : Color.primary)
         }
         .padding(.vertical, AppTheme.Spacing.small)
         .contentShape(Rectangle())
@@ -409,7 +405,7 @@ private struct TransactionRow: View {
     }
 
     private var amountText: String {
-        (transaction.isIncome ? "+" : "-") + transaction.amount.formatted(.currency(code: currencyCode))
+        "-" + transaction.amount.formatted(.currency(code: currencyCode))
     }
 
     /// "Today, 9:42 AM" for today's transactions, otherwise a short date —
@@ -427,7 +423,6 @@ private struct TransactionRow: View {
 
 private struct AddTransactionView: View {
     let categories: [ExpenseCategory]
-    let initialDirection: TransactionDirection
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -438,32 +433,19 @@ private struct AddTransactionView: View {
     @State private var selectedCategory: ExpenseCategory?
     @State private var paymentMethod: PaymentMethod = .cash
     @State private var date = Date.now
-    @State private var direction: TransactionDirection
-
-    init(categories: [ExpenseCategory], initialDirection: TransactionDirection) {
-        self.categories = categories
-        self.initialDirection = initialDirection
-        _direction = State(initialValue: initialDirection)
-    }
 
     var body: some View {
         NavigationStack {
             Form {
-                TransactionDirectionPicker(direction: $direction)
                 TextField("Amount", text: $amountText)
                     #if os(iOS)
                     .keyboardType(.decimalPad)
                     #endif
-                TextField(
-                    direction == .income ? "Received from (person, employer, etc.)" : "Paid to (merchant, person, etc.)",
-                    text: $merchantName
-                )
-                if direction == .expense {
-                    Picker("Category", selection: $selectedCategory) {
-                        Text("None").tag(ExpenseCategory?.none)
-                        ForEach(categories) { category in
-                            Text(category.name).tag(ExpenseCategory?.some(category))
-                        }
+                TextField("Paid to (merchant, person, etc.)", text: $merchantName)
+                Picker("Category", selection: $selectedCategory) {
+                    Text("None").tag(ExpenseCategory?.none)
+                    ForEach(categories) { category in
+                        Text(category.name).tag(ExpenseCategory?.some(category))
                     }
                 }
                 Picker("Payment method", selection: $paymentMethod) {
@@ -474,7 +456,7 @@ private struct AddTransactionView: View {
                 DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
                 TextField("Note", text: $note)
             }
-            .navigationTitle(direction == .income ? "Add Money In" : "Add Expense")
+            .navigationTitle("Add Transaction")
             .compactFormLayout()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -496,8 +478,7 @@ private struct AddTransactionView: View {
             note: note.isEmpty ? nil : note,
             merchantName: merchantName.isEmpty ? nil : merchantName,
             paymentMethod: paymentMethod,
-            category: direction == .expense ? selectedCategory : nil,
-            direction: direction
+            category: selectedCategory
         )
         modelContext.insert(transaction)
         do {
@@ -522,7 +503,6 @@ private struct EditTransactionView: View {
     @State private var selectedCategory: ExpenseCategory?
     @State private var paymentMethod: PaymentMethod
     @State private var date: Date
-    @State private var direction: TransactionDirection
 
     init(transaction: ExpenseTransaction, categories: [ExpenseCategory]) {
         self.transaction = transaction
@@ -533,27 +513,20 @@ private struct EditTransactionView: View {
         _selectedCategory = State(initialValue: transaction.category)
         _paymentMethod = State(initialValue: transaction.paymentMethod)
         _date = State(initialValue: transaction.date)
-        _direction = State(initialValue: transaction.direction)
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                TransactionDirectionPicker(direction: $direction)
                 TextField("Amount", text: $amountText)
                     #if os(iOS)
                     .keyboardType(.decimalPad)
                     #endif
-                TextField(
-                    direction == .income ? "Received from (person, employer, etc.)" : "Paid to (merchant, person, etc.)",
-                    text: $merchantName
-                )
-                if direction == .expense {
-                    Picker("Category", selection: $selectedCategory) {
-                        Text("None").tag(ExpenseCategory?.none)
-                        ForEach(categories) { category in
-                            Text(category.name).tag(ExpenseCategory?.some(category))
-                        }
+                TextField("Paid to (merchant, person, etc.)", text: $merchantName)
+                Picker("Category", selection: $selectedCategory) {
+                    Text("None").tag(ExpenseCategory?.none)
+                    ForEach(categories) { category in
+                        Text(category.name).tag(ExpenseCategory?.some(category))
                     }
                 }
                 Picker("Payment method", selection: $paymentMethod) {
@@ -585,9 +558,7 @@ private struct EditTransactionView: View {
         transaction.merchantName = merchantName.isEmpty ? nil : merchantName
         transaction.note = note.isEmpty ? nil : note
         transaction.paymentMethod = paymentMethod
-        transaction.category = direction == .expense ? selectedCategory : nil
-        transaction.direction = direction
-        if direction == .income { transaction.isBillLike = false }
+        transaction.category = selectedCategory
         transaction.editedAt = .now
         do {
             try modelContext.save()
@@ -596,8 +567,4 @@ private struct EditTransactionView: View {
         }
         dismiss()
     }
-}
-
-extension TransactionDirection: @retroactive Identifiable {
-    public var id: Self { self }
 }

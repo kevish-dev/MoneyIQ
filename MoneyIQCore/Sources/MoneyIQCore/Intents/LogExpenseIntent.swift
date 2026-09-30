@@ -45,48 +45,6 @@ public struct LogExpenseIntent: AppIntent {
     }
 }
 
-/// The money-in counterpart to `LogExpenseIntent` — "Log money received
-/// in MoneyIQ". Same in-process store access, recorded as income so it
-/// never counts toward the budget.
-public struct LogIncomeIntent: AppIntent {
-    public static let title: LocalizedStringResource = "Log Money Received"
-    public static let description = IntentDescription("Record money you received in MoneyIQ.")
-
-    @Parameter(title: "Amount")
-    public var amount: Double
-
-    @Parameter(title: "From", default: nil)
-    public var source: String?
-
-    public init() {}
-
-    public init(amount: Double, source: String?) {
-        self.amount = amount
-        self.source = source
-    }
-
-    public func perform() async throws -> some IntentResult & ProvidesDialog {
-        let capturedAmount = amount
-        let capturedSource = source
-
-        try await MainActor.run {
-            let container = PersistenceController.makeContainer()
-            let context = container.mainContext
-            let transaction = ExpenseTransaction(
-                amount: Decimal(capturedAmount),
-                merchantName: capturedSource,
-                paymentMethod: .other,
-                direction: .income
-            )
-            context.insert(transaction)
-            try context.save()
-        }
-
-        let dialog: IntentDialog = source.map { "Logged \(amount.formatted()) received from \($0)." } ?? "Logged \(amount.formatted()) received."
-        return .result(dialog: dialog)
-    }
-}
-
 public struct MoneyIQShortcuts: AppShortcutsProvider {
     public static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -102,15 +60,6 @@ public struct MoneyIQShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Log Expense",
             systemImageName: "creditcard"
-        )
-        AppShortcut(
-            intent: LogIncomeIntent(),
-            phrases: [
-                "Log money received in \(.applicationName)",
-                "Log income in \(.applicationName)"
-            ],
-            shortTitle: "Log Money Received",
-            systemImageName: "arrow.down.left"
         )
     }
 }

@@ -12,7 +12,6 @@ struct BudgetCardView: View {
     /// single entry point for starting a new transaction (the old toolbar
     /// menu on Home was removed in favor of this one).
     var onAddExpenseManually: (() -> Void)?
-    var onAddIncomeManually: (() -> Void)?
     var onAddExpenseFromScreenshot: (() -> Void)?
     var onAddExpenseFromClipboard: (() -> Void)?
 
@@ -128,12 +127,7 @@ struct BudgetCardView: View {
                 Button {
                     onAddExpenseManually?()
                 } label: {
-                    Label("Enter Expense", systemImage: "square.and.pencil")
-                }
-                Button {
-                    onAddIncomeManually?()
-                } label: {
-                    Label("Enter Money Received", systemImage: "arrow.down.left")
+                    Label("Enter Manually", systemImage: "square.and.pencil")
                 }
                 Button {
                     onAddExpenseFromScreenshot?()
@@ -146,7 +140,7 @@ struct BudgetCardView: View {
                     Label("Paste from Clipboard", systemImage: "doc.on.clipboard")
                 }
             } label: {
-                Label("Add", systemImage: "plus")
+                Label("Add Expense", systemImage: "plus")
                     .labelStyle(.titleAndIcon)
                     .font(.subheadline.weight(.medium))
                     .frame(maxWidth: .infinity)

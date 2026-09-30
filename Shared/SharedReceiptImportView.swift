@@ -39,12 +39,11 @@ struct SharedReceiptImportView: View {
             paymentMethod: .upi,
             isAutoImported: true,
             isBillLike: draft.isBillLike,
-            category: draft.category,
-            direction: draft.direction
+            category: draft.category
         )
         modelContext.insert(transaction)
 
-        if draft.direction == .expense, let category = draft.category, !draft.merchantName.isEmpty {
+        if let category = draft.category, !draft.merchantName.isEmpty {
             MerchantCategoryMapping.remember(merchant: draft.merchantName, category: category, context: modelContext)
         }
 

@@ -7,9 +7,6 @@ public struct ParsedReceipt: Sendable {
     public let merchantName: String?
     public let date: Date?
     public let looksLikeBill: Bool
-    /// Whether this reads as money received ("Received from", "credited")
-    /// rather than paid. Defaults to `.expense` when nothing says either way.
-    public let direction: TransactionDirection
     public let rawText: String
 }
 
@@ -26,7 +23,15 @@ public enum ReceiptParser {
         let lines = try await recognizeTextLines(in: cgImage)
         guard !lines.isEmpty else { throw ParseError.noTextFound }
 
-        return parse(lines: lines, rawText: lines.joined(separator: "\n"))
+        let rawText = lines.joined(separator: "\n")
+
+        return ParsedReceipt(
+            amount: extractAmount(from: lines),
+            merchantName: extractMerchant(from: lines),
+            date: extractDate(from: rawText),
+            looksLikeBill: detectBill(in: rawText),
+            rawText: rawText
+        )
     }
 
     /// Deliberately the long-standing `VNRecognizeTextRequest`, run
@@ -93,51 +98,13 @@ public enum ReceiptParser {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
 
-        return parse(lines: lines, rawText: text)
-    }
-
-    private static func parse(lines: [String], rawText: String) -> ParsedReceipt {
-        let direction = detectDirection(in: rawText)
         return ParsedReceipt(
             amount: extractAmount(from: lines),
-            merchantName: extractMerchant(from: lines, direction: direction),
-            date: extractDate(from: rawText),
-            // A bill is something you pay — never flag money received as one.
-            looksLikeBill: direction == .expense && detectBill(in: rawText),
-            direction: direction,
-            rawText: rawText
+            merchantName: extractMerchant(from: lines),
+            date: extractDate(from: text),
+            looksLikeBill: detectBill(in: text),
+            rawText: text
         )
-    }
-
-    // MARK: - Direction
-
-    private static let incomingPhrases = [
-        "received from", "money received", "payment received", "you received",
-        "received ₹", "received rs", "received inr", "credited to your",
-        "credited with", "credited in", "has been credited", "is credited",
-        "a/c credited", "account credited", "refund", "cashback received"
-    ]
-
-    private static let outgoingPhrases = [
-        "paid to", "payment to", "sent to", "money sent", "debited",
-        "paid ₹", "paid rs", "paid inr", "paid successfully", "payment successful",
-        "transferred to"
-    ]
-
-    /// Whichever phrase appears *first* wins. A bank SMS for a payment reads
-    /// "Rs.500 debited from A/c XX12 … credited to VPA shop@ybl" — both
-    /// words present, but the leading one is what happened to *your*
-    /// money. The same ordering makes "A/c XX12 credited with Rs.500 …"
-    /// income. No phrase at all defaults to an expense, which is what the
-    /// overwhelming majority of shared receipts are.
-    static func detectDirection(in rawText: String) -> TransactionDirection {
-        let lowered = rawText.lowercased()
-        func firstIndex(of phrases: [String]) -> String.Index? {
-            phrases.compactMap { lowered.range(of: $0)?.lowerBound }.min()
-        }
-        guard let incoming = firstIndex(of: incomingPhrases) else { return .expense }
-        guard let outgoing = firstIndex(of: outgoingPhrases) else { return .income }
-        return incoming < outgoing ? .income : .expense
     }
 
     // MARK: - Amount
@@ -164,7 +131,7 @@ public enum ReceiptParser {
     /// characters between it and the number: a misread ₹, a colon, or
     /// whitespace.
     private static let paidLineAmountRegex = try! NSRegularExpression(
-        pattern: #"\b(?:paid|amount|received|credited)\D{0,3}("# + amountNumber + #")(?![0-9])"#,
+        pattern: #"\b(?:paid|amount)\D{0,3}("# + amountNumber + #")(?![0-9])"#,
         options: [.caseInsensitive]
     )
 
@@ -216,19 +183,9 @@ public enum ReceiptParser {
         "paid to", "payment to", "sent to", "to ", "received by"
     ]
 
-    /// The counterparty on money *received* — "Received from Rahul", or a
-    /// bank SMS's "… credited … by VPA rahul@okaxis". Deliberately no bare
-    /// "to " here: on an incoming receipt that's you ("credited to your
-    /// A/c"), not the sender.
-    private static let incomingMerchantPrefixes = [
-        "received from", "sent by", "credited by", "by vpa", "from vpa",
-        "transfer from", "from:", "from "
-    ]
-
     private static let ignoredLineFragments = [
         "successful", "transaction id", "upi ref", "reference no", "utr",
-        "payment", "complete", "status", "amount", "bank", "wallet",
-        "received", "credited", "debited"
+        "payment", "complete", "status", "amount", "bank", "wallet"
     ]
 
     /// True for candidates that are actually an amount, not a name (e.g. a
@@ -243,11 +200,10 @@ public enum ReceiptParser {
         return Decimal(string: candidate.filter { !$0.isWhitespace }) != nil
     }
 
-    static func extractMerchant(from lines: [String], direction: TransactionDirection = .expense) -> String? {
-        let prefixes = direction == .income ? incomingMerchantPrefixes : merchantPrefixes
+    static func extractMerchant(from lines: [String]) -> String? {
         for line in lines {
             let lowered = line.lowercased()
-            for prefix in prefixes {
+            for prefix in merchantPrefixes {
                 if let range = lowered.range(of: prefix) {
                     let candidate = String(line[range.upperBound...])
                         .trimmingCharacters(in: .whitespacesAndNewlines)
