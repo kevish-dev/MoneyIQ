@@ -63,7 +63,7 @@ struct ScreenshotImportView: View {
                 .foregroundStyle(.secondary)
             Text("Pick a payment screenshot")
                 .font(.headline)
-            Text("From Google Pay, PhonePe, Paytm, your bank app, or a wallet. MoneyIQ reads it on-device — the image never leaves your device.")
+            Text("Money paid or received — from Google Pay, PhonePe, Paytm, your bank app, or a wallet. MoneyIQ reads it on-device — the image never leaves your device.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -143,11 +143,12 @@ struct ScreenshotImportView: View {
             paymentMethod: .upi,
             isAutoImported: true,
             isBillLike: draft.isBillLike,
-            category: draft.category
+            category: draft.category,
+            direction: draft.direction
         )
         modelContext.insert(transaction)
 
-        if let category = draft.category, !draft.merchantName.isEmpty {
+        if draft.direction == .expense, let category = draft.category, !draft.merchantName.isEmpty {
             MerchantCategoryMapping.remember(merchant: draft.merchantName, category: category, context: modelContext)
         }
 

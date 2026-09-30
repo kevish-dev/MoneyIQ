@@ -12,6 +12,7 @@ struct ReviewParsedTransactionView: View {
         var note: String
         var category: ExpenseCategory?
         var isBillLike: Bool
+        var direction: TransactionDirection
     }
 
     let parsed: ParsedReceipt
@@ -27,6 +28,7 @@ struct ReviewParsedTransactionView: View {
     @State private var note = ""
     @State private var selectedCategory: ExpenseCategory?
     @State private var isBillLike: Bool
+    @State private var direction: TransactionDirection
     @State private var categoryWasAutoSuggested = false
 
     init(parsed: ParsedReceipt, categories: [ExpenseCategory], onSave: @escaping (Draft) -> Void, onCancel: @escaping () -> Void) {
@@ -38,6 +40,7 @@ struct ReviewParsedTransactionView: View {
         _date = State(initialValue: parsed.date ?? .now)
         _merchantName = State(initialValue: parsed.merchantName ?? "")
         _isBillLike = State(initialValue: parsed.looksLikeBill)
+        _direction = State(initialValue: parsed.direction)
     }
 
     var body: some View {
@@ -49,6 +52,7 @@ struct ReviewParsedTransactionView: View {
             }
 
             Section("Details") {
+                TransactionDirectionPicker(direction: $direction)
                 HStack {
                     Text("Amount")
                     Spacer()
@@ -58,10 +62,13 @@ struct ReviewParsedTransactionView: View {
                         .keyboardType(.decimalPad)
                         #endif
                 }
-                TextField("Merchant", text: $merchantName)
+                TextField(direction == .income ? "Received from" : "Paid to", text: $merchantName)
                 DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
             }
 
+            // Categories and bills describe spending — nothing to pick for
+            // money received.
+            if direction == .expense {
             Section {
                 Picker("Category", selection: $selectedCategory) {
                     Text("None").tag(ExpenseCategory?.none)
@@ -75,6 +82,7 @@ struct ReviewParsedTransactionView: View {
                         .foregroundStyle(.secondary)
                 }
                 Toggle("This looks like a recurring bill", isOn: $isBillLike)
+            }
             }
 
             Section("Note") {
@@ -115,9 +123,25 @@ struct ReviewParsedTransactionView: View {
                 date: date,
                 merchantName: merchantName,
                 note: note,
-                category: selectedCategory,
-                isBillLike: isBillLike
+                category: direction == .expense ? selectedCategory : nil,
+                isBillLike: direction == .expense && isBillLike,
+                direction: direction
             )
         )
+    }
+}
+
+/// "Money out / Money in" segmented control, shared by every screen that
+/// creates or edits a transaction.
+struct TransactionDirectionPicker: View {
+    @Binding var direction: TransactionDirection
+
+    var body: some View {
+        Picker("Type", selection: $direction) {
+            Text("Money Out").tag(TransactionDirection.expense)
+            Text("Money In").tag(TransactionDirection.income)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
     }
 }

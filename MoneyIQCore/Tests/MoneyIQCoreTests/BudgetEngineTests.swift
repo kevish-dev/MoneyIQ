@@ -94,3 +94,16 @@ struct SavingsGoalTests {
         #expect(goal.suggestedMonthlyContribution(calendar: calendar, now: now) == 1000)
     }
 }
+
+@MainActor
+struct IncomeExclusionTests {
+    @Test func incomeNeverCountsAsSpending() {
+        let now = Date()
+        let spend = ExpenseTransaction(amount: 300, date: now)
+        let salary = ExpenseTransaction(amount: 50_000, date: now, direction: .income)
+        #expect(BudgetEngine.totalSpent(transactions: [spend, salary], inMonthContaining: now) == 300)
+        #expect(InsightsEngine.categoryBreakdown(transactions: [spend, salary], forMonthContaining: now).map(\.total) == [300])
+        #expect(InsightsEngine.monthOverMonthChange(transactions: [spend, salary], forMonthContaining: now).currentTotal == 300)
+        #expect(InsightsEngine.cashFlowForecast(transactions: [spend, salary], monthlyIncome: 1000, now: now).spentSoFarThisMonth == 300)
+    }
+}

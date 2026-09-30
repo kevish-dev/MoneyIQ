@@ -98,7 +98,8 @@ public enum BackupManager {
                 ExpenseTransactionDTO(
                     id: $0.id, amount: $0.amount, date: $0.date, note: $0.note, merchantName: $0.merchantName,
                     paymentMethod: $0.paymentMethod, isAutoImported: $0.isAutoImported, isBillLike: $0.isBillLike,
-                    categoryID: $0.category?.id, createdAt: $0.createdAt, editedAt: $0.editedAt
+                    categoryID: $0.category?.id, createdAt: $0.createdAt, editedAt: $0.editedAt,
+                    direction: $0.direction
                 )
             },
             budgets: budgets.map {
@@ -133,7 +134,7 @@ public enum BackupManager {
                 SavingsContributionDTO(id: $0.id, amount: $0.amount, date: $0.date, note: $0.note, goalID: $0.goal?.id)
             },
             ledgerContacts: ledgerContacts.map {
-                LedgerContactDTO(id: $0.id, name: $0.name, colorHex: $0.colorHex, createdAt: $0.createdAt)
+                LedgerContactDTO(id: $0.id, name: $0.name, colorHex: $0.colorHex, createdAt: $0.createdAt, lastActivityAt: $0.lastActivityAt)
             },
             ledgerEntries: ledgerEntries.map {
                 LedgerEntryDTO(
@@ -216,7 +217,8 @@ public enum BackupManager {
             let transaction = ExpenseTransaction(
                 id: dto.id, amount: dto.amount, date: dto.date, note: dto.note, merchantName: dto.merchantName,
                 paymentMethod: dto.paymentMethod, isAutoImported: dto.isAutoImported, isBillLike: dto.isBillLike,
-                category: dto.categoryID.flatMap { categoriesByID[$0] }, createdAt: dto.createdAt, editedAt: dto.editedAt
+                category: dto.categoryID.flatMap { categoriesByID[$0] }, direction: dto.direction ?? .expense,
+                createdAt: dto.createdAt, editedAt: dto.editedAt
             )
             context.insert(transaction)
         }
@@ -268,7 +270,7 @@ public enum BackupManager {
 
         var contactsByID: [UUID: LedgerContact] = [:]
         for dto in payload.ledgerContacts {
-            let contact = LedgerContact(id: dto.id, name: dto.name, colorHex: dto.colorHex, createdAt: dto.createdAt)
+            let contact = LedgerContact(id: dto.id, name: dto.name, colorHex: dto.colorHex, createdAt: dto.createdAt, lastActivityAt: dto.lastActivityAt)
             context.insert(contact)
             contactsByID[dto.id] = contact
         }

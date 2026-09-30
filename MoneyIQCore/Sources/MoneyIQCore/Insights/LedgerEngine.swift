@@ -9,6 +9,14 @@ public enum LedgerEngine {
         case settled
     }
 
+    /// When anything last happened with this person: the explicit
+    /// `lastActivityAt` stamp, their newest entry, or when they were added —
+    /// whichever is latest. What Split's "Recently updated" sort orders by.
+    public static func lastActivity(for contact: LedgerContact) -> Date {
+        let newestEntry = contact.entries.map(\.createdAt).max() ?? .distantPast
+        return max(contact.lastActivityAt ?? .distantPast, newestEntry, contact.createdAt)
+    }
+
     /// Positive = they owe you; negative = you owe them; zero = settled.
     public static func netBalance(for entries: [LedgerEntry]) -> Decimal {
         entries.reduce(Decimal(0)) { $0 + $1.signedAmount }

@@ -14,7 +14,7 @@ struct HomeView: View {
     @Query(sort: \Budget.createdAt, order: .reverse) private var budgets: [Budget]
     @Query(sort: \SavingsGoal.targetDate) private var goals: [SavingsGoal]
 
-    @State private var showingAddTransaction = false
+    @State private var addingTransactionDirection: TransactionDirection?
     @State private var showingScreenshotImport = false
     @State private var clipboardImportText: String?
     @State private var isReadingClipboard = false
@@ -25,6 +25,7 @@ struct HomeView: View {
     @State private var sortOption: TransactionSortOption = .dateDescending
     @State private var categoryFilter: ExpenseCategory?
     @State private var billsOnly = false
+    @State private var directionFilter: TransactionDirection?
     #if os(iOS)
     @State private var liveActivityManager = BudgetLiveActivityManager()
     #endif
@@ -38,12 +39,26 @@ struct HomeView: View {
         var id: String { rawValue }
     }
 
-    /// `transactions` (the raw `@Query`) filtered by search text/category/
-    /// bills-only, then sorted per `sortOption` — the `@Query`'s own sort
-    /// (newest first) is just the default before any of this is applied.
-    private var displayedTransactions: [ExpenseTransaction] {
-        var result = transactions
+    /// Home is a "this month" view — earlier months live in Insights. The
+    /// full `@Query` is still kept for the budget rollover/Live Activity
+    /// math, which needs last month too.
+    private var currentMonthTransactions: [ExpenseTransaction] {
+        let calendar = Calendar.current
+        let monthStart = calendar.startOfMonth(for: .now)
+        guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return [] }
+        return transactions.filter { $0.date >= monthStart && $0.date < monthEnd }
+    }
 
+    /// `currentMonthTransactions` filtered by search text/category/
+    /// bills-only/direction, then sorted per `sortOption` — the `@Query`'s
+    /// own sort (newest first) is just the default before any of this is
+    /// applied.
+    private var displayedTransactions: [ExpenseTransaction] {
+        var result = currentMonthTransactions
+
+        if let directionFilter {
+            result = result.filter { $0.direction == directionFilter }
+        }
         if let categoryFilter {
             result = result.filter { $0.category?.id == categoryFilter.id }
         }
@@ -69,7 +84,11 @@ struct HomeView: View {
     }
 
     private var isFiltering: Bool {
-        categoryFilter != nil || billsOnly
+        categoryFilter != nil || billsOnly || directionFilter != nil
+    }
+
+    private var monthSectionTitle: String {
+        Date.now.formatted(.dateTime.month(.wide).year())
     }
 
     /// Extracted so the category filter Menu's button labels aren't
@@ -93,7 +112,8 @@ struct HomeView: View {
                     // the budget card in plain list style.
                     BudgetCardView(
                         currencyCode: account.preferredCurrencyCode,
-                        onAddExpenseManually: { showingAddTransaction = true },
+                        onAddExpenseManually: { addingTransactionDirection = .expense },
+                        onAddIncomeManually: { addingTransactionDirection = .income },
                         onAddExpenseFromScreenshot: { showingScreenshotImport = true },
                         onAddExpenseFromClipboard: { pasteFromClipboard() }
                     )
@@ -107,11 +127,17 @@ struct HomeView: View {
                     .listRowBackground(Color.clear)
                 }
 
-                Section("Recent transactions") {
-                    if transactions.isEmpty {
-                        Text("No transactions yet.")
+                Section(monthSectionTitle) {
+                    if currentMonthTransactions.isEmpty {
+                        Text("No transactions this month yet.")
                             .foregroundStyle(.secondary)
-                    } else if displayedTransactions.isEmpty {
+                    } else {
+                        MonthCashFlowRow(
+                            transactions: currentMonthTransactions,
+                            currencyCode: account?.preferredCurrencyCode ?? "USD"
+                        )
+                    }
+                    if !currentMonthTransactions.isEmpty && displayedTransactions.isEmpty {
                         Text("No transactions match your search/filters.")
                             .foregroundStyle(.secondary)
                     }
@@ -157,6 +183,12 @@ struct HomeView: View {
                             }
                         }
 
+                        Picker("Show", selection: $directionFilter) {
+                            Text("Money in & out").tag(TransactionDirection?.none)
+                            Text("Money out").tag(TransactionDirection?.some(.expense))
+                            Text("Money in").tag(TransactionDirection?.some(.income))
+                        }
+
                         Menu("Category") {
                             Button {
                                 categoryFilter = nil
@@ -185,8 +217,8 @@ struct HomeView: View {
             .sheet(item: $editingTransaction) { transaction in
                 EditTransactionView(transaction: transaction, categories: categories)
             }
-            .sheet(isPresented: $showingAddTransaction) {
-                AddTransactionView(categories: categories)
+            .sheet(item: $addingTransactionDirection) { direction in
+                AddTransactionView(categories: categories, initialDirection: direction)
             }
             .sheet(isPresented: $showingScreenshotImport) {
                 ScreenshotImportView(categories: categories)
@@ -337,7 +369,9 @@ private struct TransactionRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            IconBubble(systemName: transaction.category?.systemIconName ?? "creditcard")
+            IconBubble(systemName: transaction.isIncome
+                ? "arrow.down.left"
+                : transaction.category?.systemIconName ?? "creditcard")
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
@@ -372,6 +406,7 @@ private struct TransactionRow: View {
             Spacer()
             Text(amountText)
                 .font(.subheadline.weight(.semibold))
+                .foregroundStyle(transaction.isIncome ? Color.green : Color.primary)
         }
         .padding(.vertical, AppTheme.Spacing.small)
         .contentShape(Rectangle())
@@ -388,7 +423,7 @@ private struct TransactionRow: View {
     }
 
     private var amountText: String {
-        "-" + transaction.amount.formatted(.currency(code: currencyCode))
+        (transaction.isIncome ? "+" : "-") + transaction.amount.formatted(.currency(code: currencyCode))
     }
 
     /// "Today, 9:42 AM" for today's transactions, otherwise a short date —
@@ -406,6 +441,7 @@ private struct TransactionRow: View {
 
 private struct AddTransactionView: View {
     let categories: [ExpenseCategory]
+    let initialDirection: TransactionDirection
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -416,19 +452,32 @@ private struct AddTransactionView: View {
     @State private var selectedCategory: ExpenseCategory?
     @State private var paymentMethod: PaymentMethod = .cash
     @State private var date = Date.now
+    @State private var direction: TransactionDirection
+
+    init(categories: [ExpenseCategory], initialDirection: TransactionDirection) {
+        self.categories = categories
+        self.initialDirection = initialDirection
+        _direction = State(initialValue: initialDirection)
+    }
 
     var body: some View {
         NavigationStack {
             Form {
+                TransactionDirectionPicker(direction: $direction)
                 TextField("Amount", text: $amountText)
                     #if os(iOS)
                     .keyboardType(.decimalPad)
                     #endif
-                TextField("Paid to (merchant, person, etc.)", text: $merchantName)
-                Picker("Category", selection: $selectedCategory) {
-                    Text("None").tag(ExpenseCategory?.none)
-                    ForEach(categories) { category in
-                        Text(category.name).tag(ExpenseCategory?.some(category))
+                TextField(
+                    direction == .income ? "Received from (person, employer, etc.)" : "Paid to (merchant, person, etc.)",
+                    text: $merchantName
+                )
+                if direction == .expense {
+                    Picker("Category", selection: $selectedCategory) {
+                        Text("None").tag(ExpenseCategory?.none)
+                        ForEach(categories) { category in
+                            Text(category.name).tag(ExpenseCategory?.some(category))
+                        }
                     }
                 }
                 Picker("Payment method", selection: $paymentMethod) {
@@ -439,7 +488,7 @@ private struct AddTransactionView: View {
                 DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
                 TextField("Note", text: $note)
             }
-            .navigationTitle("Add Transaction")
+            .navigationTitle(direction == .income ? "Add Money In" : "Add Expense")
             .compactFormLayout()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -461,7 +510,8 @@ private struct AddTransactionView: View {
             note: note.isEmpty ? nil : note,
             merchantName: merchantName.isEmpty ? nil : merchantName,
             paymentMethod: paymentMethod,
-            category: selectedCategory
+            category: direction == .expense ? selectedCategory : nil,
+            direction: direction
         )
         modelContext.insert(transaction)
         do {
@@ -486,6 +536,7 @@ private struct EditTransactionView: View {
     @State private var selectedCategory: ExpenseCategory?
     @State private var paymentMethod: PaymentMethod
     @State private var date: Date
+    @State private var direction: TransactionDirection
 
     init(transaction: ExpenseTransaction, categories: [ExpenseCategory]) {
         self.transaction = transaction
@@ -496,20 +547,27 @@ private struct EditTransactionView: View {
         _selectedCategory = State(initialValue: transaction.category)
         _paymentMethod = State(initialValue: transaction.paymentMethod)
         _date = State(initialValue: transaction.date)
+        _direction = State(initialValue: transaction.direction)
     }
 
     var body: some View {
         NavigationStack {
             Form {
+                TransactionDirectionPicker(direction: $direction)
                 TextField("Amount", text: $amountText)
                     #if os(iOS)
                     .keyboardType(.decimalPad)
                     #endif
-                TextField("Paid to (merchant, person, etc.)", text: $merchantName)
-                Picker("Category", selection: $selectedCategory) {
-                    Text("None").tag(ExpenseCategory?.none)
-                    ForEach(categories) { category in
-                        Text(category.name).tag(ExpenseCategory?.some(category))
+                TextField(
+                    direction == .income ? "Received from (person, employer, etc.)" : "Paid to (merchant, person, etc.)",
+                    text: $merchantName
+                )
+                if direction == .expense {
+                    Picker("Category", selection: $selectedCategory) {
+                        Text("None").tag(ExpenseCategory?.none)
+                        ForEach(categories) { category in
+                            Text(category.name).tag(ExpenseCategory?.some(category))
+                        }
                     }
                 }
                 Picker("Payment method", selection: $paymentMethod) {
@@ -541,7 +599,9 @@ private struct EditTransactionView: View {
         transaction.merchantName = merchantName.isEmpty ? nil : merchantName
         transaction.note = note.isEmpty ? nil : note
         transaction.paymentMethod = paymentMethod
-        transaction.category = selectedCategory
+        transaction.category = direction == .expense ? selectedCategory : nil
+        transaction.direction = direction
+        if direction == .income { transaction.isBillLike = false }
         transaction.editedAt = .now
         do {
             try modelContext.save()
@@ -549,5 +609,44 @@ private struct EditTransactionView: View {
             print("MoneyIQ: failed to save edited transaction: \(error)")
         }
         dismiss()
+    }
+}
+
+extension TransactionDirection: @retroactive Identifiable {
+    public var id: Self { self }
+}
+
+/// This month's money in vs. money out, at the top of Home's list — income
+/// never touches the budget card, so this is where it shows up.
+private struct MonthCashFlowRow: View {
+    let transactions: [ExpenseTransaction]
+    let currencyCode: String
+
+    private var moneyIn: Decimal {
+        transactions.filter(\.isIncome).reduce(Decimal(0)) { $0 + $1.amount }
+    }
+
+    private var moneyOut: Decimal {
+        transactions.expensesOnly.reduce(Decimal(0)) { $0 + $1.amount }
+    }
+
+    var body: some View {
+        HStack(spacing: AppTheme.Spacing.large) {
+            column(title: "Money in", amount: moneyIn, systemImage: "arrow.down.left", tint: .green)
+            Divider()
+            column(title: "Money out", amount: moneyOut, systemImage: "arrow.up.right", tint: AppTheme.accent)
+        }
+        .padding(.vertical, AppTheme.Spacing.small)
+    }
+
+    private func column(title: String, amount: Decimal, systemImage: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Label(title, systemImage: systemImage)
+                .font(.caption)
+                .foregroundStyle(tint)
+            Text(amount, format: .currency(code: currencyCode))
+                .font(.subheadline.weight(.semibold))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

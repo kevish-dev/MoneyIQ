@@ -230,6 +230,7 @@ struct LedgerContactDetailView: View {
     }
 
     private func delete(_ entry: LedgerEntry) {
+        entry.contact?.markActivity()
         modelContext.delete(entry)
         do {
             try modelContext.save()
@@ -389,6 +390,7 @@ private struct AddLedgerEntryView: View {
             contact: contact
         )
         modelContext.insert(entry)
+        contact.markActivity()
         do {
             try modelContext.save()
         } catch {
@@ -471,6 +473,7 @@ private struct EditLedgerEntryView: View {
         entry.note = note.isEmpty ? nil : note
         entry.date = date
         entry.isSettlement = isSettlement
+        entry.contact?.markActivity()
         do {
             try modelContext.save()
         } catch {

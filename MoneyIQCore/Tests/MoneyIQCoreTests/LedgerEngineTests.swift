@@ -96,3 +96,25 @@ struct LedgerEngineTests {
         #expect(LedgerEngine.splitEqually(total: 100, participantCount: 0).isEmpty)
     }
 }
+
+@MainActor
+struct LedgerLastActivityTests {
+    @Test func explicitActivityStampWinsOverOlderEntries() {
+        let old = Date(timeIntervalSince1970: 1_000)
+        let contact = LedgerContact(name: "Asha", createdAt: old)
+        contact.entries = [LedgerEntry(amount: 10, direction: .iPaid, createdAt: old)]
+        let edited = Date(timeIntervalSince1970: 5_000)
+        contact.markActivity(at: edited)
+        #expect(LedgerEngine.lastActivity(for: contact) == edited)
+    }
+
+    @Test func fallsBackToNewestEntryForContactsWithoutAStamp() {
+        let contact = LedgerContact(name: "Ravi", createdAt: Date(timeIntervalSince1970: 1_000))
+        let newest = Date(timeIntervalSince1970: 9_000)
+        contact.entries = [
+            LedgerEntry(amount: 10, direction: .iPaid, createdAt: Date(timeIntervalSince1970: 2_000)),
+            LedgerEntry(amount: 5, direction: .theyPaid, createdAt: newest)
+        ]
+        #expect(LedgerEngine.lastActivity(for: contact) == newest)
+    }
+}

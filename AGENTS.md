@@ -86,7 +86,7 @@ exercises `PersistenceController` itself. Run them with:
 cd MoneyIQCore && xcrun --sdk macosx swift test
 ```
 
-78 tests as of the last commit, across `ReceiptParserTests`,
+87 tests as of the last commit, across `ReceiptParserTests`,
 `ReceiptImagePipelineTests`, `ShareImportInboxTests`, `InsightsEngineTests`,
 `BudgetEngineTests`, `SavingsGoalTests`, `LedgerEngineTests`,
 `FreelanceProjectEngineTests`, `BackupManagerTests`,
@@ -119,6 +119,15 @@ If you're asked to build something the PRD marks as paid-gated, **verify
 empirically by actually building it** before assuming it's blocked. `xcodebuild`
 with a personal/free signing team either succeeds or fails with a specific,
 legible error — don't guess from the PRD table alone.
+
+### New `@Model` properties must be optional (or nil-tolerant)
+
+SwiftData's lightweight migration adds the column but does **not** backfill
+a declared default (`var x: Enum = .foo`) into existing rows — they come in
+as nil, and reading one into a non-optional property crashes ("Could not
+cast value of type Optional<Any>"). Verified with an old-commit → new-code
+store harness. Pattern: store it optional and expose a non-optional
+accessor — see `ExpenseTransaction.storedDirection` / `direction`.
 
 ### OCR: use `VNRecognizeTextRequest`, not the async `RecognizeTextRequest`
 

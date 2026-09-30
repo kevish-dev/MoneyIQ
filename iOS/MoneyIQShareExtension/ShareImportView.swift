@@ -102,6 +102,11 @@ private struct ReadyView: View {
         VStack(spacing: 20) {
             Spacer()
             VStack(spacing: 8) {
+                if candidate.parsed.direction == .income {
+                    Label("Money received", systemImage: "arrow.down.left")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.green)
+                }
                 if let amount = candidate.parsed.amount {
                     Text(amount, format: .currency(code: "INR"))
                         .font(.system(size: 44, weight: .bold, design: .rounded))
@@ -113,7 +118,7 @@ private struct ReadyView: View {
                         .foregroundStyle(.secondary)
                 }
                 if let merchant = candidate.parsed.merchantName {
-                    Text("To \(merchant)")
+                    Text(candidate.parsed.direction == .income ? "From \(merchant)" : "To \(merchant)")
                         .font(.headline)
                         .multilineTextAlignment(.center)
                 }

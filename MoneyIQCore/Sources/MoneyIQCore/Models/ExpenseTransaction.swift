@@ -10,6 +10,14 @@ public enum PaymentMethod: String, Codable, CaseIterable {
     case other
 }
 
+/// Whether money left your account (an expense) or came into it (income,
+/// a refund, someone paying you back). Income is recorded alongside
+/// expenses but never counts toward spending, budgets, or insights.
+public enum TransactionDirection: String, Codable, CaseIterable, Sendable {
+    case expense
+    case income
+}
+
 @Model
 public final class ExpenseTransaction {
     @Attribute(.unique) public var id: UUID
@@ -34,6 +42,20 @@ public final class ExpenseTransaction {
 
     public var category: ExpenseCategory?
 
+    /// Stored as optional on purpose: rows from before income existed
+    /// migrate in with nil here — SwiftData does *not* backfill a declared
+    /// default into existing rows, and reading a nil into a non-optional
+    /// enum crashes (verified against a real pre-income store). Read and
+    /// write through `direction` instead.
+    public var storedDirection: TransactionDirection?
+
+    public var direction: TransactionDirection {
+        get { storedDirection ?? .expense }
+        set { storedDirection = newValue }
+    }
+
+    public var isIncome: Bool { direction == .income }
+
     public init(
         id: UUID = UUID(),
         amount: Decimal,
@@ -44,6 +66,7 @@ public final class ExpenseTransaction {
         isAutoImported: Bool = false,
         isBillLike: Bool = false,
         category: ExpenseCategory? = nil,
+        direction: TransactionDirection = .expense,
         createdAt: Date = .now,
         editedAt: Date? = nil
     ) {
@@ -56,7 +79,14 @@ public final class ExpenseTransaction {
         self.isAutoImported = isAutoImported
         self.isBillLike = isBillLike
         self.category = category
+        self.storedDirection = direction
         self.createdAt = createdAt
         self.editedAt = editedAt
     }
+}
+
+public extension Array where Element == ExpenseTransaction {
+    /// Just the money-out rows — what every spending total, budget, and
+    /// insight is computed from.
+    var expensesOnly: [ExpenseTransaction] { filter { !$0.isIncome } }
 }

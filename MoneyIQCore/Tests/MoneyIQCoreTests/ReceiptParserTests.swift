@@ -136,3 +136,41 @@ struct ReceiptParserTests {
         #expect(MerchantCategoryMapping.normalize("  Swiggy  ") == "swiggy")
     }
 }
+
+struct ReceiptParserDirectionTests {
+    @Test func upiReceivedReceiptIsIncomeWithSenderAsMerchant() {
+        let parsed = ReceiptParser.parse(text: "₹500\nReceived from Rahul Sharma\nrahul@okaxis\n19 Sep 2026, 05:52 pm\nUPI transaction ID 626224365150")
+        #expect(parsed.direction == .income)
+        #expect(parsed.amount == Decimal(500))
+        #expect(parsed.merchantName == "Rahul Sharma")
+        #expect(parsed.looksLikeBill == false)
+    }
+
+    @Test func bankCreditSMSIsIncome() {
+        let parsed = ReceiptParser.parse(text: "Your A/c XX1234 credited with Rs.2,500.00 on 19-09-26 by VPA rahul@okaxis (UPI Ref 626224365150)")
+        #expect(parsed.direction == .income)
+        #expect(parsed.amount == Decimal(string: "2500.00"))
+    }
+
+    /// Both "debited" and "credited" appear — the leading one is what
+    /// happened to your account.
+    @Test func bankDebitSMSMentioningCreditToPayeeIsExpense() {
+        let parsed = ReceiptParser.parse(text: "Rs.500 debited from A/c XX1234 on 19-09-26 and credited to VPA shop@ybl")
+        #expect(parsed.direction == .expense)
+    }
+
+    @Test func paidReceiptIsExpense() {
+        let parsed = ReceiptParser.parse(text: "Paid ₹80\nTo Big Mama Confectionery\n19 Sep '26")
+        #expect(parsed.direction == .expense)
+        #expect(parsed.merchantName == "Big Mama Confectionery")
+    }
+
+    @Test func textWithNoDirectionWordsDefaultsToExpense() {
+        #expect(ReceiptParser.parse(text: "Swiggy\n₹250").direction == .expense)
+    }
+
+    @Test func misreadRupeeOnReceivedLineStillReadsAmount() {
+        #expect(ReceiptParser.extractAmount(from: ["Received ·1,200", "From: Priya"]) == Decimal(1200))
+        #expect(ReceiptParser.extractMerchant(from: ["Received ·1,200", "From: Priya"], direction: .income) == "Priya")
+    }
+}

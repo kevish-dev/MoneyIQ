@@ -19,10 +19,11 @@ struct LedgerView: View {
     @State private var renamingContact: LedgerContact?
     @State private var contactsPendingDelete: [LedgerContact]?
     @State private var searchText = ""
-    @State private var sortOption: ContactSortOption = .recentlyAdded
+    @State private var sortOption: ContactSortOption = .recentlyUpdated
     @State private var balanceFilter: BalanceFilter = .all
 
     private enum ContactSortOption: String, CaseIterable, Identifiable {
+        case recentlyUpdated = "Recently updated"
         case recentlyAdded = "Recently added"
         case nameAscending = "Name: A to Z"
         case nameDescending = "Name: Z to A"
@@ -67,6 +68,8 @@ struct LedgerView: View {
         }
 
         switch sortOption {
+        case .recentlyUpdated:
+            result.sort { LedgerEngine.lastActivity(for: $0) > LedgerEngine.lastActivity(for: $1) }
         case .recentlyAdded:
             result.sort { $0.createdAt > $1.createdAt }
         case .nameAscending:

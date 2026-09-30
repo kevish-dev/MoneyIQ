@@ -2,7 +2,8 @@ import Foundation
 
 /// Pure, testable spending-analysis logic (Phase 4 of the PRD). Everything
 /// here operates on plain arrays of already-fetched transactions rather than
-/// a `ModelContext`, so it's cheap to unit test without SwiftData.
+/// a `ModelContext`, so it's cheap to unit test without SwiftData. Income
+/// rows are dropped at every entry point — this is all spending analysis.
 public enum InsightsEngine {
     public struct MonthlyTotal: Identifiable, Sendable {
         public let id = UUID()
@@ -84,7 +85,7 @@ public enum InsightsEngine {
             cursor = next
         }
 
-        for transaction in transactions {
+        for transaction in transactions.expensesOnly {
             let monthStart = calendar.startOfMonth(for: transaction.date)
             guard monthStart >= earliestStart else { continue }
             buckets[monthStart, default: 0] += transaction.amount
@@ -116,7 +117,7 @@ public enum InsightsEngine {
             cursor = next
         }
 
-        for transaction in transactions {
+        for transaction in transactions.expensesOnly {
             let yearStart = calendar.startOfYear(for: transaction.date)
             guard yearStart >= earliestStart else { continue }
             buckets[yearStart, default: 0] += transaction.amount
@@ -137,7 +138,7 @@ public enum InsightsEngine {
         guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return [] }
 
         var totals: [String: Decimal] = [:]
-        for transaction in transactions where transaction.date >= monthStart && transaction.date < monthEnd {
+        for transaction in transactions.expensesOnly where transaction.date >= monthStart && transaction.date < monthEnd {
             let name = transaction.category?.name ?? "Uncategorized"
             totals[name, default: 0] += transaction.amount
         }
@@ -160,7 +161,7 @@ public enum InsightsEngine {
 
         struct Bucket { var total: Decimal = 0; var icon: String = "questionmark.circle" }
         var buckets: [String: Bucket] = [:]
-        for transaction in transactions where transaction.date >= monthStart && transaction.date < monthEnd {
+        for transaction in transactions.expensesOnly where transaction.date >= monthStart && transaction.date < monthEnd {
             let name = transaction.category?.name ?? "Uncategorized"
             var bucket = buckets[name] ?? Bucket()
             bucket.total += transaction.amount
@@ -224,7 +225,7 @@ public enum InsightsEngine {
             cursor = next
         }
 
-        for transaction in transactions {
+        for transaction in transactions.expensesOnly {
             let day = calendar.startOfDay(for: transaction.date)
             guard day >= monthStart && day <= endBound else { continue }
             buckets[day, default: 0] += transaction.amount
@@ -268,7 +269,7 @@ public enum InsightsEngine {
 
     private static func totalSpent(transactions: [ExpenseTransaction], inMonth monthStart: Date, calendar: Calendar) -> Decimal {
         guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return 0 }
-        return transactions
+        return transactions.expensesOnly
             .filter { $0.date >= monthStart && $0.date < monthEnd }
             .reduce(Decimal(0)) { $0 + $1.amount }
     }
@@ -306,7 +307,7 @@ public enum InsightsEngine {
 
     private static func totalSpent(transactions: [ExpenseTransaction], inYear yearStart: Date, calendar: Calendar) -> Decimal {
         guard let yearEnd = calendar.date(byAdding: .year, value: 1, to: yearStart) else { return 0 }
-        return transactions
+        return transactions.expensesOnly
             .filter { $0.date >= yearStart && $0.date < yearEnd }
             .reduce(Decimal(0)) { $0 + $1.amount }
     }
@@ -329,7 +330,7 @@ public enum InsightsEngine {
         let monthStart = calendar.startOfMonth(for: date)
         guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return [] }
 
-        let named = transactions.filter {
+        let named = transactions.expensesOnly.filter {
             $0.date >= monthStart && $0.date < monthEnd && $0.merchantName?.isEmpty == false
         }
         let byMerchant = Dictionary(grouping: named) { MerchantCategoryMapping.normalize($0.merchantName!) }
@@ -357,7 +358,7 @@ public enum InsightsEngine {
         thresholdMultiplier: Decimal = 2.0,
         minimumSampleSize: Int = 3
     ) -> [Anomaly] {
-        let byCategory = Dictionary(grouping: transactions) { $0.category?.id }
+        let byCategory = Dictionary(grouping: transactions.expensesOnly) { $0.category?.id }
 
         var results: [Anomaly] = []
         for (_, categoryTransactions) in byCategory {
@@ -389,7 +390,7 @@ public enum InsightsEngine {
         amountToleranceFraction: Decimal = 0.15,
         calendar: Calendar = .current
     ) -> [SubscriptionCandidate] {
-        let named = transactions.filter { ($0.merchantName?.isEmpty == false) }
+        let named = transactions.expensesOnly.filter { ($0.merchantName?.isEmpty == false) }
         let byMerchant = Dictionary(grouping: named) { MerchantCategoryMapping.normalize($0.merchantName!) }
 
         var candidates: [SubscriptionCandidate] = []
@@ -440,6 +441,7 @@ public enum InsightsEngine {
         calendar: Calendar = .current,
         now: Date = .now
     ) -> CashFlowForecast {
+        let transactions = transactions.expensesOnly
         let monthStart = calendar.startOfMonth(for: now)
         let spentThisMonth = transactions
             .filter { $0.date >= monthStart }

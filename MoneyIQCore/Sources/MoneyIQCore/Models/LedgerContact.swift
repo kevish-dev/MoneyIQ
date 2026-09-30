@@ -11,6 +11,12 @@ public final class LedgerContact {
     public var colorHex: String
     public var createdAt: Date
 
+    /// Bumped whenever one of this person's entries is added, edited, or
+    /// deleted — drives Split's "recently updated" ordering. Nil for
+    /// contacts from before this existed; `LedgerEngine.lastActivity`
+    /// falls back to their newest entry.
+    public var lastActivityAt: Date?
+
     @Relationship(deleteRule: .cascade, inverse: \LedgerEntry.contact)
     public var entries: [LedgerEntry] = []
 
@@ -18,12 +24,18 @@ public final class LedgerContact {
         id: UUID = UUID(),
         name: String,
         colorHex: String = LedgerContact.randomColorHex(),
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        lastActivityAt: Date? = nil
     ) {
         self.id = id
         self.name = name
         self.colorHex = colorHex
         self.createdAt = createdAt
+        self.lastActivityAt = lastActivityAt
+    }
+
+    public func markActivity(at date: Date = .now) {
+        lastActivityAt = date
     }
 
     private static let palette = ["FF6B6B", "4ECDC4", "556FB5", "FFB84C", "9B5DE5", "00BBF9", "F15BB5", "845EC2"]

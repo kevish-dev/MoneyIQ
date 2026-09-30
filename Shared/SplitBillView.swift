@@ -143,6 +143,7 @@ struct SplitBillView: View {
                 contact: contact
             )
             modelContext.insert(entry)
+            contact.markActivity()
         }
         do {
             try modelContext.save()
