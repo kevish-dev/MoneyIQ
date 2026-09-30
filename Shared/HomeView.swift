@@ -25,7 +25,6 @@ struct HomeView: View {
     @State private var sortOption: TransactionSortOption = .dateDescending
     @State private var categoryFilter: ExpenseCategory?
     @State private var billsOnly = false
-    @State private var directionFilter: TransactionDirection?
     #if os(iOS)
     @State private var liveActivityManager = BudgetLiveActivityManager()
     #endif
@@ -46,7 +45,7 @@ struct HomeView: View {
         let calendar = Calendar.current
         let monthStart = calendar.startOfMonth(for: .now)
         guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return [] }
-        return transactions.filter { $0.date >= monthStart && $0.date < monthEnd }
+        return transactions.expensesOnly.filter { $0.date >= monthStart && $0.date < monthEnd }
     }
 
     /// `currentMonthTransactions` filtered by search text/category/
@@ -56,9 +55,6 @@ struct HomeView: View {
     private var displayedTransactions: [ExpenseTransaction] {
         var result = currentMonthTransactions
 
-        if let directionFilter {
-            result = result.filter { $0.direction == directionFilter }
-        }
         if let categoryFilter {
             result = result.filter { $0.category?.id == categoryFilter.id }
         }
@@ -84,7 +80,7 @@ struct HomeView: View {
     }
 
     private var isFiltering: Bool {
-        categoryFilter != nil || billsOnly || directionFilter != nil
+        categoryFilter != nil || billsOnly
     }
 
     private var monthSectionTitle: String {
@@ -131,11 +127,6 @@ struct HomeView: View {
                     if currentMonthTransactions.isEmpty {
                         Text("No transactions this month yet.")
                             .foregroundStyle(.secondary)
-                    } else {
-                        MonthCashFlowRow(
-                            transactions: currentMonthTransactions,
-                            currencyCode: account?.preferredCurrencyCode ?? "USD"
-                        )
                     }
                     if !currentMonthTransactions.isEmpty && displayedTransactions.isEmpty {
                         Text("No transactions match your search/filters.")
@@ -183,11 +174,6 @@ struct HomeView: View {
                             }
                         }
 
-                        Picker("Show", selection: $directionFilter) {
-                            Text("Money in & out").tag(TransactionDirection?.none)
-                            Text("Money out").tag(TransactionDirection?.some(.expense))
-                            Text("Money in").tag(TransactionDirection?.some(.income))
-                        }
 
                         Menu("Category") {
                             Button {
@@ -614,39 +600,4 @@ private struct EditTransactionView: View {
 
 extension TransactionDirection: @retroactive Identifiable {
     public var id: Self { self }
-}
-
-/// This month's money in vs. money out, at the top of Home's list — income
-/// never touches the budget card, so this is where it shows up.
-private struct MonthCashFlowRow: View {
-    let transactions: [ExpenseTransaction]
-    let currencyCode: String
-
-    private var moneyIn: Decimal {
-        transactions.filter(\.isIncome).reduce(Decimal(0)) { $0 + $1.amount }
-    }
-
-    private var moneyOut: Decimal {
-        transactions.expensesOnly.reduce(Decimal(0)) { $0 + $1.amount }
-    }
-
-    var body: some View {
-        HStack(spacing: AppTheme.Spacing.large) {
-            column(title: "Money in", amount: moneyIn, systemImage: "arrow.down.left", tint: .green)
-            Divider()
-            column(title: "Money out", amount: moneyOut, systemImage: "arrow.up.right", tint: AppTheme.accent)
-        }
-        .padding(.vertical, AppTheme.Spacing.small)
-    }
-
-    private func column(title: String, amount: Decimal, systemImage: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Label(title, systemImage: systemImage)
-                .font(.caption)
-                .foregroundStyle(tint)
-            Text(amount, format: .currency(code: currencyCode))
-                .font(.subheadline.weight(.semibold))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
 }
