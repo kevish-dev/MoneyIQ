@@ -25,9 +25,7 @@ struct HomeView: View {
     @State private var sortOption: TransactionSortOption = .dateDescending
     @State private var categoryFilter: ExpenseCategory?
     @State private var billsOnly = false
-    #if os(iOS)
     @State private var liveActivityManager = BudgetLiveActivityManager()
-    #endif
 
     private enum TransactionSortOption: String, CaseIterable, Identifiable {
         case dateDescending = "Newest first"
@@ -235,7 +233,6 @@ struct HomeView: View {
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppTheme.rowCornerRadius, style: .continuous))
                 }
             }
-            #if os(iOS)
             // Keeps the Lock Screen / Dynamic Island Live Activity in sync
             // with real budget data whenever it changes — opt-in via
             // Settings, since showing anything outside the app shouldn't be
@@ -272,15 +269,12 @@ struct HomeView: View {
                     liveActivityManager.start(state: state)
                 }
             }
-            #endif
         }
     }
 
-    #if os(iOS)
     private var liveActivitySyncKey: String {
         "\(settings.isBudgetLockScreenEnabled)-\(settings.isBudgetDynamicIslandEnabled)-\(settings.lockScreenContentKind.rawValue)-\(settings.dynamicIslandContentKind.rawValue)-\(budgets.first?.id.uuidString ?? "none")-\(transactions.count)-\(goals.count)"
     }
-    #endif
 
     private var account: UserAccount? { authManager.currentAccount }
 
@@ -438,9 +432,7 @@ private struct AddTransactionView: View {
         NavigationStack {
             Form {
                 TextField("Amount", text: $amountText)
-                    #if os(iOS)
                     .keyboardType(.decimalPad)
-                    #endif
                 TextField("Paid to (merchant, person, etc.)", text: $merchantName)
                 Picker("Category", selection: $selectedCategory) {
                     Text("None").tag(ExpenseCategory?.none)
@@ -519,9 +511,7 @@ private struct EditTransactionView: View {
         NavigationStack {
             Form {
                 TextField("Amount", text: $amountText)
-                    #if os(iOS)
                     .keyboardType(.decimalPad)
-                    #endif
                 TextField("Paid to (merchant, person, etc.)", text: $merchantName)
                 Picker("Category", selection: $selectedCategory) {
                     Text("None").tag(ExpenseCategory?.none)

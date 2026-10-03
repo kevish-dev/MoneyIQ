@@ -2,11 +2,7 @@ import SwiftUI
 import PhotosUI
 import MoneyIQCore
 
-#if os(iOS)
 import UIKit
-#elseif os(macOS)
-import AppKit
-#endif
 
 /// Renders a `UserAccount`'s avatar — a photo takes priority over an emoji,
 /// which takes priority over initials-on-a-tinted-circle (the previous,
@@ -54,13 +50,8 @@ struct AvatarView: View {
 }
 
 func platformImage(from data: Data) -> Image? {
-    #if os(iOS)
     guard let uiImage = UIImage(data: data) else { return nil }
     return Image(uiImage: uiImage)
-    #elseif os(macOS)
-    guard let nsImage = NSImage(data: data) else { return nil }
-    return Image(nsImage: nsImage)
-    #endif
 }
 
 /// Downscales + compresses a picked photo before it goes into SwiftData —
@@ -68,7 +59,6 @@ func platformImage(from data: Data) -> Image? {
 /// store lean. Runs off the main actor since `PhotosPickerItem` loading is
 /// already async.
 func resizedAvatarData(from data: Data, maxDimension: CGFloat = 320) -> Data? {
-    #if os(iOS)
     guard let image = UIImage(data: data) else { return nil }
     let scale = min(1, maxDimension / max(image.size.width, image.size.height))
     let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
@@ -77,18 +67,6 @@ func resizedAvatarData(from data: Data, maxDimension: CGFloat = 320) -> Data? {
         image.draw(in: CGRect(origin: .zero, size: newSize))
     }
     return resized.jpegData(compressionQuality: 0.85)
-    #elseif os(macOS)
-    guard let image = NSImage(data: data) else { return nil }
-    let scale = min(1, maxDimension / max(image.size.width, image.size.height))
-    let newSize = NSSize(width: image.size.width * scale, height: image.size.height * scale)
-    let resized = NSImage(size: newSize)
-    resized.lockFocus()
-    image.draw(in: NSRect(origin: .zero, size: newSize))
-    resized.unlockFocus()
-    guard let tiffData = resized.tiffRepresentation,
-          let bitmap = NSBitmapImageRep(data: tiffData) else { return nil }
-    return bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.85])
-    #endif
 }
 
 /// Sheet for choosing a photo, an emoji, or resetting back to initials —

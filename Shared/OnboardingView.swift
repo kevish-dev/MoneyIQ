@@ -17,20 +17,14 @@ struct OnboardingView: View {
                 TextField("First name", text: $firstName)
                 TextField("Last name", text: $lastName)
                 TextField("Mobile number", text: $mobileNumber)
-                    #if os(iOS)
                     .keyboardType(.phonePad)
-                    #endif
                 TextField("Age", text: $age)
-                    #if os(iOS)
                     .keyboardType(.numberPad)
-                    #endif
             }
 
             Section("Income") {
                 TextField("Monthly income", text: $monthlyIncome)
-                    #if os(iOS)
                     .keyboardType(.decimalPad)
-                    #endif
             }
 
             Section {
@@ -45,10 +39,6 @@ struct OnboardingView: View {
             lastName = account.lastName
             mobileNumber = account.mobileNumber ?? ""
         }
-        #if os(macOS)
-        .padding()
-        .frame(minWidth: 420, minHeight: 420)
-        #endif
     }
 
     private func save() {

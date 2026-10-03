@@ -1,11 +1,7 @@
 import Foundation
 import UniformTypeIdentifiers
 import MoneyIQCore
-#if os(iOS)
 import UIKit
-#elseif os(macOS)
-import AppKit
-#endif
 
 /// Reads a payment off the clipboard for "Paste from Clipboard": text, or an
 /// image — several UPI apps' own Copy button (Slice, notably) copies a
@@ -26,7 +22,6 @@ enum ClipboardReceiptReader {
         var denied = false
         var unreadableImage = false
 
-        #if os(iOS)
         let pasteboard = UIPasteboard.general
         // These three don't trigger iOS's "Allow Paste" prompt; reading content does.
         let hasStrings = pasteboard.hasStrings
@@ -55,28 +50,12 @@ enum ClipboardReceiptReader {
                 denied = true
             }
         }
-        #elseif os(macOS)
-        let pasteboard = NSPasteboard.general
-        if let text = nonEmpty(pasteboard.string(forType: .string)) {
-            if ReceiptParser.parse(text: text).amount != nil { return .found(text) }
-            candidates.append(text)
-        }
-        if let data = pasteboard.data(forType: .png) ?? pasteboard.data(forType: .tiff) {
-            if let text = await recognizedText(in: data) {
-                if ReceiptParser.parse(text: text).amount != nil { return .found(text) }
-                candidates.insert(text, at: 0)
-            } else {
-                unreadableImage = true
-            }
-        }
-        #endif
 
         if let first = candidates.first { return .found(first) }
         if unreadableImage { return .noTextInImage }
         return denied ? .notAllowed : .empty
     }
 
-    #if os(iOS)
     /// Prefers the raw image bytes (ImageIO then honors their orientation
     /// tag) over a `UIImage` round-trip, and also accepts a copied image
     /// file URL.
@@ -95,7 +74,6 @@ enum ClipboardReceiptReader {
         }
         return nil
     }
-    #endif
 
     private static func recognizedText(in data: Data) async -> String? {
         guard let cgImage = ReceiptImageLoader.cgImage(from: data),

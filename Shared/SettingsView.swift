@@ -217,23 +217,13 @@ struct SettingsView: View {
     }
 
     private func openSystemNotificationSettings() {
-        #if os(iOS)
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
         }
-        #elseif os(macOS)
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
-            NSWorkspace.shared.open(url)
-        }
-        #endif
     }
 }
 
-#if os(iOS)
 import UIKit
-#elseif os(macOS)
-import AppKit
-#endif
 
 #Preview {
     let container = PersistenceController.makeContainer(inMemory: true)

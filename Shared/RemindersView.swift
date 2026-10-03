@@ -237,9 +237,7 @@ private struct AddReminderView: View {
                     Spacer()
                     TextField("0.00", text: $amountText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 Picker("Repeats", selection: $frequency) {
                     Text("Once").tag(ReminderFrequency.once)

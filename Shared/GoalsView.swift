@@ -255,9 +255,7 @@ private struct AddContributionView: View {
                     Spacer()
                     TextField("0.00", text: $amountText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
                 TextField("Note (optional)", text: $note)
@@ -317,9 +315,7 @@ private struct EditContributionView: View {
                     Spacer()
                     TextField("0.00", text: $amountText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
                 TextField("Note (optional)", text: $note)
@@ -390,9 +386,7 @@ private struct EditGoalView: View {
                     Spacer()
                     TextField("0.00", text: $targetText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 DatePicker("Target date", selection: $targetDate, displayedComponents: .date)
                 Picker("Icon", selection: $icon) {
@@ -473,9 +467,7 @@ private struct AddGoalView: View {
                     Spacer()
                     TextField("0.00", text: $targetText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 DatePicker("Target date", selection: $targetDate, displayedComponents: .date)
                 Picker("Icon", selection: $icon) {

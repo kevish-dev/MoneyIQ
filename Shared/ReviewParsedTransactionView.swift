@@ -54,9 +54,7 @@ struct ReviewParsedTransactionView: View {
                     Spacer()
                     TextField("0.00", text: $amountText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 TextField("Merchant", text: $merchantName)
                 DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])

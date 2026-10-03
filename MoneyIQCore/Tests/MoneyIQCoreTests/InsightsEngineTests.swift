@@ -113,13 +113,16 @@ struct InsightsEngineTests {
     @Test func cashFlowForecastSubtractsSpendAndUpcomingBills() {
         let now = Date()
         let calendar = Calendar.current
+        // Anchored to calendar months, not "N days ago" — a fixed offset
+        // lands in the wrong month for part of every month.
+        let lastMonthStart = calendar.date(byAdding: .month, value: -1, to: calendar.startOfMonth(for: now))!
         let lastMonthBill = ExpenseTransaction(
             amount: 500,
-            date: calendar.date(byAdding: .day, value: -35, to: now)!,
+            date: calendar.date(byAdding: .day, value: 10, to: lastMonthStart)!,
             merchantName: "Electricity Board",
             isBillLike: true
         )
-        let thisMonthSpend = makeTransaction(amount: 200, daysAgo: 1, now: now)
+        let thisMonthSpend = makeTransaction(amount: 200, daysAgo: 0, now: now)
 
         let forecast = InsightsEngine.cashFlowForecast(
             transactions: [lastMonthBill, thisMonthSpend],

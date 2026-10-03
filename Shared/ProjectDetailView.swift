@@ -380,9 +380,7 @@ private struct AddInstallmentView: View {
                         Spacer()
                         TextField(entryMode == .percentage ? "0" : "0.00", text: $valueText)
                             .multilineTextAlignment(.trailing)
-                            #if os(iOS)
                             .keyboardType(.decimalPad)
-                            #endif
                     }
                     if let computedAmount {
                         HStack {
@@ -471,9 +469,7 @@ private struct EditInstallmentView: View {
                     Spacer()
                     TextField("0.00", text: $amountText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 Toggle("Due date", isOn: $hasDueDate)
                 if hasDueDate {
@@ -610,9 +606,7 @@ private struct AddReimbursementView: View {
                     Spacer()
                     TextField("0.00", text: $amountText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 DatePicker("Date", selection: $date, displayedComponents: .date)
                 TextField("Note (optional)", text: $note)
@@ -680,9 +674,7 @@ private struct EditReimbursementView: View {
                     Spacer()
                     TextField("0.00", text: $amountText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 DatePicker("Date", selection: $date, displayedComponents: .date)
                 Toggle("Recovered from client", isOn: $isRecovered)
@@ -755,9 +747,7 @@ private struct EditProjectView: View {
                     Spacer()
                     TextField("0.00", text: $totalText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 TextField("Notes (optional)", text: $notes)
 

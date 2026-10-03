@@ -357,9 +357,7 @@ private struct AddLedgerEntryView: View {
                         Spacer()
                         TextField("0.00", text: $amountText)
                             .multilineTextAlignment(.trailing)
-                            #if os(iOS)
                             .keyboardType(.decimalPad)
-                            #endif
                     }
                     DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
                     TextField(isSettlement ? "Note (optional)" : "What for? (e.g. Borrowed cash, Shopping)", text: $note)
@@ -438,9 +436,7 @@ private struct EditLedgerEntryView: View {
                         Spacer()
                         TextField("0.00", text: $amountText)
                             .multilineTextAlignment(.trailing)
-                            #if os(iOS)
                             .keyboardType(.decimalPad)
-                            #endif
                     }
                     DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
                     TextField("What for? (e.g. Borrowed cash, Shopping)", text: $note)

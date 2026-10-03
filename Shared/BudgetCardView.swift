@@ -178,9 +178,7 @@ private struct BudgetEditView: View {
                     Spacer()
                     TextField("0.00", text: $capText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 Toggle("Roll over unused budget", isOn: $rolloverEnabled)
                 Text("If you spend less than your cap this month, the leftover adds to next month's budget. Overspending never carries forward.")

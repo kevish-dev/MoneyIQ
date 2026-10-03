@@ -12,7 +12,6 @@ struct LiveActivitySettingsView: View {
     let lockManager: AppLockManager
 
     var body: some View {
-        #if os(iOS)
         Form {
             Section {
                 Toggle(isOn: $settings.isBudgetLockScreenEnabled) {
@@ -48,17 +47,8 @@ struct LiveActivitySettingsView: View {
         }
         .navigationTitle("Live Activity")
         .compactFormLayout()
-        #else
-        ContentUnavailableView(
-            "iOS Only",
-            systemImage: "iphone",
-            description: Text("Lock Screen and Dynamic Island Live Activities are an iOS feature — open MoneyIQ on your iPhone to customize this.")
-        )
-        .navigationTitle("Live Activity")
-        #endif
     }
 
-    #if os(iOS)
     private func contentKindPicker(selection: Binding<LiveActivityContentKind>) -> some View {
         Picker("Shows", selection: selection) {
             ForEach(LiveActivityContentKind.allCases, id: \.self) { kind in
@@ -97,7 +87,6 @@ struct LiveActivitySettingsView: View {
                 .foregroundStyle(.secondary)
         }
     }
-    #endif
 }
 
 #Preview {

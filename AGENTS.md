@@ -12,8 +12,8 @@ it," plus the engineering conventions this repo follows.
 
 ## What this project is
 
-A privacy-conscious, native Apple personal finance app (iOS + macOS,
-universal). SwiftUI, SwiftData, no backend server. See the PRD for the full
+A privacy-conscious, native Apple personal finance app (iPhone + iPad;
+iOS only — there is no Mac app). SwiftUI, SwiftData, no backend server. See the PRD for the full
 product vision; see [README.md](README.md) for what's actually built and
 how to run it.
 
@@ -37,17 +37,15 @@ mention it.
 ## Architecture
 
 - `MoneyIQCore/` — a Swift package, **all business logic and data models
-  live here**, shared between the iOS and macOS app targets. If you're
+  live here**, used by the iOS app and its extensions. If you're
   adding a model, a piece of domain logic, or anything that isn't pure
   SwiftUI view code, it goes here, not in `Shared/`.
-- `Shared/` — SwiftUI views, shared between both app targets by being
-  compiled directly into each (not a framework — just shared source files
-  via `project.yml`'s `sources:`).
-- `iOS/MoneyIQ/`, `macOS/MoneyIQ/` — thin app entry points (`@main` struct +
+- `Shared/` — SwiftUI views, compiled directly into the iOS app target
+  (not a framework — just source files via `project.yml`'s `sources:`).
+- `iOS/MoneyIQ/` — thin app entry point (`@main` struct +
   `ModelContainer` wiring). Almost nothing platform-specific lives here.
 - `iOS/MoneyIQWidgets/` — the widget extension hosting the Live Activity.
-  iOS-only; there is no macOS equivalent because ActivityKit doesn't exist
-  on macOS.
+  ActivityKit is iOS-only.
 - `project.yml` — [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec.
   **The `.xcodeproj` is generated and gitignored.** Never hand-edit it —
   edit `project.yml` and run `xcodegen generate`. If you add a new source
@@ -96,6 +94,16 @@ will catch it," since the UI in this app can't currently be clicked through
 reliably in CI/automation (see below).
 
 ## Things that are true but not obvious
+
+### iPhone + iPad only; `MoneyIQCore` still lists macOS on purpose
+
+The shipped app is iOS only (universal iPhone/iPad) — the macOS target was
+removed and `Shared/` has no `#if os(macOS)` code. `MoneyIQCore/Package.swift`
+still declares `.macOS(.v26)`: that is only the *test host* so
+`xcrun --sdk macosx swift test` runs the unit tests in seconds without a
+simulator. It never ships. Consequence: Core's iOS-only code (ActivityKit,
+UIKit) must stay inside `#if os(iOS)`, and `PlatformWindow.swift` keeps a
+small AppKit branch so the package compiles on the Mac host.
 
 ### The PRD's "needs paid Apple Developer Program" column is wrong in places
 
@@ -158,11 +166,11 @@ silently go nowhere. What works instead:
   whenever the app becomes active, so a share still arrives if the app
   switch is ever blocked.
 
-### Deployment target is iOS 26 / macOS 26, on purpose
+### Deployment target is iOS 26, on purpose
 
 This is required for Liquid Glass (`.glassEffect`, `GlassEffectContainer`,
 `.buttonStyle(.glass)`/`.glassProminent`). The SDK in this environment is
-Xcode 27 / iOS 27 / macOS 27, so 26.0 is the practical floor, not the
+Xcode 27 / iOS 27, so 26.0 is the practical floor, not the
 ceiling. `MoneyIQCore/Package.swift` needs `swift-tools-version: 6.2` for
 the `.v26` platform enum cases to exist at all — if you bump the deployment
 target further, check whether the tools-version needs bumping too.
@@ -251,8 +259,7 @@ xcodegen generate
 # Package unit tests (fast, no simulator needed)
 cd MoneyIQCore && xcrun --sdk macosx swift test
 
-# Full app builds
-xcodebuild -project MoneyIQ.xcodeproj -scheme MoneyIQ-macOS -destination 'platform=macOS' build
+# Full app build
 xcodebuild -project MoneyIQ.xcodeproj -scheme MoneyIQ-iOS -destination 'id=<simulator-udid>' build
 ```
 
@@ -268,10 +275,9 @@ above) — always real build errors caught by actually running `xcodebuild`,
 never assumed away. Keep that standard:
 
 1. `xcodegen generate` after touching `project.yml` or adding new targets.
-2. Both `MoneyIQ-iOS` and `MoneyIQ-macOS` build clean — a change in
-   `Shared/` or `MoneyIQCore/` affects both, and platform-conditional code
-   (`#if os(iOS)`) is easy to get wrong in the direction that only fails on
-   the platform you didn't build.
+2. `MoneyIQ-iOS` builds clean, and `MoneyIQCore` still compiles for macOS
+   (that's how `swift test` runs — see the note on the package below), so
+   keep its `#if os(iOS)` guards around UIKit/ActivityKit code.
 3. `swift test` in `MoneyIQCore/` for anything touching `Insights/` logic.
 4. For UI changes, prefer an offline `ImageRenderer` harness over assuming
    it looks right, given the interactive-simulator caveats above — or use

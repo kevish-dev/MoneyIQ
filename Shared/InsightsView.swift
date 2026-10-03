@@ -105,9 +105,7 @@ struct InsightsView: View {
                 .padding(.bottom, AppTheme.Spacing.large)
             }
             .navigationTitle("Insights")
-            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
                 ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
                     ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)

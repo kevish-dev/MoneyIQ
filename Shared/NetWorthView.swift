@@ -161,9 +161,7 @@ private struct AddNetWorthAccountView: View {
                     Spacer()
                     TextField("0.00", text: $balanceText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 Picker("Icon", selection: $icon) {
                     ForEach(iconChoices, id: \.self) { name in

@@ -167,9 +167,7 @@ private struct AddProjectView: View {
                     Spacer()
                     TextField("0.00", text: $totalText)
                         .multilineTextAlignment(.trailing)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                 }
                 TextField("Notes (optional)", text: $notes)
             }

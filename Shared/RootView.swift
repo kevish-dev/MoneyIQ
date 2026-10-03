@@ -98,9 +98,7 @@ struct RootView: View {
     }
 
     private func collectPendingImports() {
-        #if os(iOS)
         ShareImportInbox.pendingImports().forEach(enqueue)
-        #endif
         presentNextImport()
     }
 
@@ -130,9 +128,7 @@ struct RootView: View {
         }
         if let id = presentedImportID {
             handledImportIDs.insert(id)
-            #if os(iOS)
             ShareImportInbox.remove(id: id)
-            #endif
             presentedImportID = nil
         }
         Task { @MainActor in

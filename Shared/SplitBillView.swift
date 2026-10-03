@@ -46,9 +46,7 @@ struct SplitBillView: View {
                         Spacer()
                         TextField("0.00", text: $totalText)
                             .multilineTextAlignment(.trailing)
-                            #if os(iOS)
                             .keyboardType(.decimalPad)
-                            #endif
                     }
                     DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
                     TextField("What for? (e.g. Dinner)", text: $note)

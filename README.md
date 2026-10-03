@@ -1,7 +1,7 @@
 # MoneyIQ
 
 A privacy-conscious, native Apple personal finance and expense management app
-for macOS and iOS. It minimizes manual data entry through screenshot-based
+for iPhone and iPad. It minimizes manual data entry through screenshot-based
 transaction capture, on-device intelligence, and deep OS integration
 (widgets, Siri, Live Activities), unifies authentication across providers
 into a single account, and supports individual as well as shared/family
@@ -27,7 +27,7 @@ budgeting.
 - **Net worth tracking** across linked accounts/assets.
 - **Deep OS integration.** Home/Lock Screen widgets, Face ID app lock, Siri
   Shortcuts / App Intents ("Log ₹200 for lunch"), Live Activities for
-  real-time budget tracking, and Handoff across iPhone/Mac/iPad.
+  real-time budget tracking, and Handoff across iPhone and iPad.
 - **Custom reminders** for recurring payments (title, frequency, time,
   amount), with local notification delivery.
 - **Privacy and reliability by design.** Financial screenshots never leave
@@ -62,7 +62,7 @@ below.
   `ExpenseTransaction`, `Budget`, `ReminderItem`.
 - **Manual transaction entry**, a monthly budget cap model, and basic
   onboarding (name, mobile, age, income, preferred currency).
-- **Native Liquid Glass UI** (iOS 26 / macOS 26): an animated splash screen,
+- **Native Liquid Glass UI** (iOS 26): an animated splash screen,
   a sign-in screen built from real `.glassEffect`/`GlassEffectContainer`
   materials, a live glass "M" wordmark, a rendered app icon, and real brand
   marks (official Google "G" and GitHub Octocat vector assets) on the
@@ -165,12 +165,12 @@ below).
 
 ## Project structure
 
-- `MoneyIQCore/` — Swift package shared by both apps: SwiftData models, auth
-  logic, persistence. Has its own test target.
-- `iOS/MoneyIQ/`, `macOS/MoneyIQ/` — thin app entry points per platform.
+- `MoneyIQCore/` — Swift package used by the app: SwiftData models, auth
+  logic, persistence. Has its own test target (run on the Mac host for speed).
+- `iOS/MoneyIQ/` — thin app entry point.
 - `iOS/MoneyIQWidgets/` — the widget extension target hosting the budget
-  Live Activity (iOS-only; ActivityKit doesn't exist on macOS).
-- `Shared/` — SwiftUI views shared by both app targets (splash, sign-in,
+  Live Activity (ActivityKit is iOS-only).
+- `Shared/` — SwiftUI views (splash, sign-in,
   onboarding, home, settings, app lock) plus `DesignSystem/` for the shared
   Liquid Glass backdrop and logo, and `Assets.xcassets` for the app icon and
   brand marks.
@@ -184,7 +184,7 @@ below).
 
 ### Prerequisites
 
-- Xcode with the iOS 26 / macOS 26 SDKs (Liquid Glass — `.glassEffect`,
+- Xcode with the iOS 26 SDK (Liquid Glass — `.glassEffect`,
   `GlassEffectContainer`, `.buttonStyle(.glass...)` — needs these; deployment
   target is set to 26.0 in `project.yml`)
 - [Homebrew](https://brew.sh)
@@ -212,8 +212,7 @@ configured" until you do it:
 1. **Google OAuth client** (free, no Apple account needed)
    - [Google Cloud Console](https://console.cloud.google.com/) → APIs &
      Services → Credentials → Create Credentials → OAuth client ID.
-   - Application type: **iOS** — bundle ID `com.moneyiq.ios` (create a
-     second one for `com.moneyiq.macos` if you want to test both targets).
+   - Application type: **iOS** — bundle ID `com.moneyiq.ios`.
    - Copy the client ID into `Config/Secrets.xcconfig` as
      `MIQ_GOOGLE_CLIENT_ID`. Leave `MIQ_GOOGLE_REDIRECT_URI` as
      `moneyiq://oauth/google` — it's already wired into both apps'
@@ -236,15 +235,14 @@ configured" until you do it:
 
 ### Build and run
 
-Open `MoneyIQ.xcodeproj` in Xcode, pick the `MoneyIQ-iOS` or `MoneyIQ-macOS`
+Open `MoneyIQ.xcodeproj` in Xcode, pick the `MoneyIQ-iOS`
 scheme, and hit Run — or from the command line:
 
 ```bash
 # Package tests
 cd MoneyIQCore && xcrun --sdk macosx swift test
 
-# Full app builds
-xcodebuild -project MoneyIQ.xcodeproj -scheme MoneyIQ-macOS -destination 'platform=macOS' build
+# Full app build
 xcodebuild -project MoneyIQ.xcodeproj -scheme MoneyIQ-iOS -destination 'generic/platform=iOS Simulator' build
 ```
 

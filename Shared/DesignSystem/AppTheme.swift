@@ -8,15 +8,10 @@ import SwiftUI
 /// automatically) plus the darker gradient stops used for hero cards that
 /// need an explicit `Color`/`LinearGradient` value.
 enum AppTheme {
-    /// The trailing (right-side) toolbar slot — `.topBarTrailing` is
-    /// iOS-only, so this picks the closest macOS equivalent instead of
-    /// failing to compile there. Used for the top-right profile icon.
+    /// The trailing (right-side) toolbar slot, used for the top-right
+    /// profile icon.
     static var trailingToolbarPlacement: ToolbarItemPlacement {
-        #if os(iOS)
         .topBarTrailing
-        #else
-        .primaryAction
-        #endif
     }
 
     /// Bright orange accent — same value as Assets.xcassets/AccentColor.
@@ -80,10 +75,8 @@ extension View {
     func compactListLayout() -> some View {
         self
             .listStyle(.plain)
-            #if os(iOS)
             .listSectionSpacing(.compact)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
     }
 
     /// Same top-gap/title treatment as `compactListLayout()`, for
@@ -92,9 +85,7 @@ extension View {
     /// but still tightens section spacing and the top gap for consistency.
     func compactFormLayout() -> some View {
         self
-            #if os(iOS)
             .listSectionSpacing(.compact)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
     }
 }
