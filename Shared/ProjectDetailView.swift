@@ -61,7 +61,7 @@ struct ProjectDetailView: View {
                     InstallmentRow(installment: installment, currencyCode: currencyCode)
                         .contentShape(Rectangle())
                         // Tapping opens a small sheet to set/edit exactly
-                        // which date it was received on, rather than
+                        // when it was received, rather than
                         // silently stamping "today" — see
                         // `InstallmentReceivedView`.
                         .onTapGesture { receivedDateEditTarget = installment }
@@ -294,12 +294,12 @@ private struct InstallmentRow: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                if let dueDate = installment.dueDate {
-                    Text(installment.isReceived ? "Received \(installment.receivedDate?.formatted(.dateTime.month().day()) ?? "")" : "Due \(dueDate.formatted(.dateTime.month().day()))")
+                if installment.isReceived {
+                    Text(installment.receivedDate.map { "Received \($0.formatted(.dateTime.month().day().hour().minute()))" } ?? "Received")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                } else if installment.isReceived, let receivedDate = installment.receivedDate {
-                    Text("Received \(receivedDate.formatted(.dateTime.month().day()))")
+                } else if let dueDate = installment.dueDate {
+                    Text("Due \(dueDate.formatted(.dateTime.month().day()))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -447,6 +447,7 @@ private struct EditInstallmentView: View {
     @State private var hasDueDate: Bool
     @State private var dueDate: Date
     @State private var isReceived: Bool
+    @State private var receivedDate: Date
     @State private var note: String
 
     init(project: FreelanceProject, installment: PaymentInstallment) {
@@ -457,6 +458,7 @@ private struct EditInstallmentView: View {
         _hasDueDate = State(initialValue: installment.dueDate != nil)
         _dueDate = State(initialValue: installment.dueDate ?? .now)
         _isReceived = State(initialValue: installment.isReceived)
+        _receivedDate = State(initialValue: installment.receivedDate ?? .now)
         _note = State(initialValue: installment.note ?? "")
     }
 
@@ -476,6 +478,9 @@ private struct EditInstallmentView: View {
                     DatePicker("Due", selection: $dueDate, displayedComponents: .date)
                 }
                 Toggle("Received", isOn: $isReceived)
+                if isReceived {
+                    DatePicker("Received at", selection: $receivedDate, displayedComponents: [.date, .hourAndMinute])
+                }
                 TextField("Note (optional)", text: $note)
             }
             .navigationTitle("Edit Installment")
@@ -500,10 +505,8 @@ private struct EditInstallmentView: View {
         // entered percentage, so drop it rather than show a stale figure.
         installment.percentage = nil
         installment.dueDate = hasDueDate ? dueDate : nil
-        if isReceived != installment.isReceived {
-            installment.receivedDate = isReceived ? .now : nil
-        }
         installment.isReceived = isReceived
+        installment.receivedDate = isReceived ? receivedDate : nil
         installment.note = note.isEmpty ? nil : note
         do {
             try modelContext.save()
@@ -520,8 +523,8 @@ private enum InstallmentEntryMode {
 }
 
 /// Shown when tapping an installment row — marks it received (or, if
-/// already received, lets the date be corrected) on a date the user picks
-/// rather than always silently stamping "today."
+/// already received, lets the date and time be corrected) at a moment the
+/// user picks rather than always silently stamping "now."
 private struct InstallmentReceivedView: View {
     @Bindable var installment: PaymentInstallment
 
@@ -540,7 +543,7 @@ private struct InstallmentReceivedView: View {
             Form {
                 Section {
                     LabeledContent(installment.label, value: installment.amount.formatted(.currency(code: installment.project?.currencyCode ?? "USD")))
-                    DatePicker("Received on", selection: $receivedDate, displayedComponents: .date)
+                    DatePicker("Received at", selection: $receivedDate, displayedComponents: [.date, .hourAndMinute])
                 }
 
                 if installment.isReceived {
@@ -549,7 +552,7 @@ private struct InstallmentReceivedView: View {
                     }
                 }
             }
-            .navigationTitle(installment.isReceived ? "Edit Received Date" : "Mark Received")
+            .navigationTitle(installment.isReceived ? "Edit Receipt" : "Mark Received")
             .compactFormLayout()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
