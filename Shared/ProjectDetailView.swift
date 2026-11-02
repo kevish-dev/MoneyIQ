@@ -40,32 +40,65 @@ struct ProjectDetailView: View {
     private var totalReimbursed: Decimal { FreelanceProjectEngine.totalReimbursed(project.reimbursements) }
     private var outstandingReimbursements: Decimal { FreelanceProjectEngine.outstandingReimbursements(project.reimbursements) }
 
-    var body: some View {
-        List {
-            summaryHeader
-                .listRowInsets(EdgeInsets(
-                    top: AppTheme.Spacing.small,
-                    leading: AppTheme.Spacing.large,
-                    bottom: AppTheme.Spacing.small,
-                    trailing: AppTheme.Spacing.large
-                ))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
+    private var projectFacts: [String] {
+        [
+            "Project: \(project.name)",
+            "Client: \(project.clientName ?? "Not set")",
+            "Quoted total: \(project.totalAmount.formatted(.currency(code: currencyCode)))",
+            "Received: \(received.formatted(.currency(code: currencyCode)))",
+            "Scheduled but pending: \(pending.formatted(.currency(code: currencyCode)))",
+            "Not scheduled yet: \(unallocated.formatted(.currency(code: currencyCode)))",
+            "Reimbursements still owed: \(outstandingReimbursements.formatted(.currency(code: currencyCode)))"
+        ] + installments.prefix(8).map {
+            "Installment \($0.label): \($0.amount.formatted(.currency(code: currencyCode))); \($0.isReceived ? "received" : "pending"); due \($0.dueDate?.formatted(date: .abbreviated, time: .omitted) ?? "not set")"
+        }
+    }
 
-            Section {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+            summaryHeader
+            HStack(spacing: 10) {
+                Button { showingAddInstallment = true } label: {
+                    Label("Add payment", systemImage: "plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                Button { showingAddReimbursement = true } label: {
+                    Label("Log cost", systemImage: "arrow.uturn.backward")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+            }
+
+            LocalIntelligenceCard(
+                title: "Project brief",
+                subtitle: "Ask about payments and money to recover",
+                facts: projectFacts,
+                suggestions: ["What is still owed?", "Which payment should I follow up on?"]
+            )
+
+            sectionHeading("PAYMENT INSTALLMENTS", count: installments.count) {
+                showingAddInstallment = true
+            }
                 if installments.isEmpty {
-                    Text("No installments yet — add one for each payment you expect (an advance, a milestone, final payment, ...).")
-                        .foregroundStyle(.secondary)
+                    emptySection("Set up an advance, milestone, or final payment to track what the client owes.")
                 }
                 ForEach(installments) { installment in
-                    InstallmentRow(installment: installment, currencyCode: currencyCode)
-                        .contentShape(Rectangle())
-                        // Tapping opens a small sheet to set/edit exactly
-                        // when it was received, rather than
-                        // silently stamping "today" — see
-                        // `InstallmentReceivedView`.
-                        .onTapGesture { receivedDateEditTarget = installment }
-                        .contextMenu {
+                    HStack(spacing: 4) {
+                        InstallmentRow(installment: installment, currencyCode: currencyCode)
+                            .frame(maxWidth: .infinity)
+                            .contentShape(Rectangle())
+                            .onTapGesture { receivedDateEditTarget = installment }
+                        Button { editingInstallment = installment } label: {
+                            Image(systemName: "pencil").frame(width: 34, height: 34)
+                        }
+                        .buttonStyle(.glass)
+                        .accessibilityLabel("Edit \(installment.label)")
+                    }
+                    .padding(.horizontal, 12)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 18))
+                    .contextMenu {
                             if installment.isReceived {
                                 Button {
                                     toggleReceived(installment)
@@ -83,26 +116,38 @@ struct ProjectDetailView: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
-                        }
+                    }
                 }
-            } header: {
-                Text("Payment Installments")
-            } footer: {
                 if unallocated > 0 {
                     Text("\(unallocated.formatted(.currency(code: currencyCode))) of the total isn't scheduled in any installment yet.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-            }
 
-            Section {
+            sectionHeading("REIMBURSEMENTS", count: reimbursements.count) {
+                showingAddReimbursement = true
+            }
                 if reimbursements.isEmpty {
-                    Text("No reimbursable expenses yet — log anything you pay out of pocket for this project (a domain, hosting, tools) here, separately from the client's payments above.")
-                        .foregroundStyle(.secondary)
+                    emptySection("Paid for a domain, tool, or travel? Log it here to track what the client owes back.")
                 }
                 ForEach(reimbursements) { reimbursement in
-                    ReimbursementRow(reimbursement: reimbursement, currencyCode: currencyCode)
-                        .contentShape(Rectangle())
-                        .onTapGesture { toggleRecovered(reimbursement) }
-                        .contextMenu {
+                    HStack(spacing: 4) {
+                        ReimbursementRow(reimbursement: reimbursement, currencyCode: currencyCode)
+                            .frame(maxWidth: .infinity)
+                        Button { toggleRecovered(reimbursement) } label: {
+                            Image(systemName: reimbursement.isRecovered ? "arrow.uturn.backward" : "checkmark")
+                                .frame(width: 34, height: 34)
+                        }
+                        .buttonStyle(.glass)
+                        .accessibilityLabel(reimbursement.isRecovered ? "Mark \(reimbursement.title) not recovered" : "Mark \(reimbursement.title) recovered")
+                        Button { editingReimbursement = reimbursement } label: {
+                            Image(systemName: "pencil").frame(width: 34, height: 34)
+                        }
+                        .buttonStyle(.glass)
+                        .accessibilityLabel("Edit \(reimbursement.title)")
+                    }
+                    .padding(.horizontal, 12)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 18))
+                    .contextMenu {
                             Button {
                                 toggleRecovered(reimbursement)
                             } label: {
@@ -118,38 +163,23 @@ struct ProjectDetailView: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
-                        }
+                    }
                 }
-            } header: {
-                Text("Reimbursements")
-            } footer: {
-                Text("Money you fronted for this project that the client owes back — tracked separately from their payment installments.")
+                Text("Costs you fronted, tracked separately from the project quote.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 30)
         }
         .navigationTitle(project.name)
-        .compactListLayout()
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem {
                 Button {
                     showingEditProject = true
                 } label: {
                     Label("Edit Project", systemImage: "pencil")
-                }
-            }
-            ToolbarItem {
-                Menu {
-                    Button {
-                        showingAddInstallment = true
-                    } label: {
-                        Label("Add Installment", systemImage: "banknote")
-                    }
-                    Button {
-                        showingAddReimbursement = true
-                    } label: {
-                        Label("Add Reimbursement", systemImage: "arrow.counterclockwise.circle")
-                    }
-                } label: {
-                    Label("Add", systemImage: "plus")
                 }
             }
         }
@@ -199,6 +229,28 @@ struct ProjectDetailView: View {
         }
     }
 
+    private func sectionHeading(_ title: String, count: Int, add: @escaping () -> Void) -> some View {
+        HStack {
+            Text(title).tracking(1.4)
+            Text("\(count)").foregroundStyle(AppTheme.accent)
+            Spacer()
+            Button(action: add) { Image(systemName: "plus") }
+                .buttonStyle(.glass)
+                .accessibilityLabel("Add \(title.lowercased())")
+        }
+        .font(.system(size: 11, weight: .bold, design: .rounded))
+        .foregroundStyle(.secondary)
+    }
+
+    private func emptySection(_ message: String) -> some View {
+        Text(message)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+            .glassEffect(.regular, in: .rect(cornerRadius: 18))
+    }
+
     private var summaryHeader: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
             if let clientName = project.clientName, !clientName.isEmpty {
@@ -213,12 +265,12 @@ struct ProjectDetailView: View {
                 .tint(.white)
                 .background(Color.white.opacity(0.2), in: Capsule())
 
-            HStack(spacing: AppTheme.Spacing.medium) {
+            HStack(spacing: 8) {
                 summaryChip(label: "Received", amount: received, tint: .green)
                 summaryChip(label: "Pending", amount: pending, tint: .white)
-                if outstandingReimbursements > 0 {
-                    summaryChip(label: "To recover", amount: outstandingReimbursements, tint: .orange)
-                }
+            }
+            if outstandingReimbursements > 0 {
+                summaryChip(label: "To recover", amount: outstandingReimbursements, tint: .orange)
             }
         }
         .padding(AppTheme.Spacing.large)
@@ -241,7 +293,7 @@ struct ProjectDetailView: View {
         }
         .padding(.horizontal, AppTheme.Spacing.medium)
         .padding(.vertical, AppTheme.Spacing.small)
-        .background(AppTheme.pillBackgroundOnHero, in: Capsule())
+        .glassEffect(.regular.tint(.white.opacity(0.08)), in: .capsule)
     }
 
     private func toggleReceived(_ installment: PaymentInstallment) {
@@ -303,6 +355,9 @@ private struct InstallmentRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                Text(installment.isReceived ? "Tap to correct receipt" : "Tap to mark received")
+                    .font(.caption2)
+                    .foregroundStyle(AppTheme.accent)
             }
             Spacer()
             Text(installment.amount, format: .currency(code: currencyCode))
@@ -366,6 +421,8 @@ private struct AddInstallmentView: View {
     var body: some View {
         NavigationStack {
             Form {
+                FinanceFormIntro(icon: "banknote", title: "Schedule a payment", detail: "Use a percentage or a fixed amount. The due date helps you know when to follow up.")
+                    .listRowBackground(Color.clear)
                 TextField("Label (e.g. Advance, Milestone 1)", text: $label)
 
                 Section {
@@ -396,7 +453,7 @@ private struct AddInstallmentView: View {
                 Section {
                     Toggle("Due date", isOn: $hasDueDate)
                     if hasDueDate {
-                        DatePicker("Due", selection: $dueDate, displayedComponents: .date)
+                        DatePicker("Due", selection: $dueDate, displayedComponents: [.date, .hourAndMinute])
                     }
                     TextField("Note (optional)", text: $note)
                 }
@@ -406,7 +463,7 @@ private struct AddInstallmentView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(label.trimmingCharacters(in: .whitespaces).isEmpty || computedAmount == nil)
+                        .disabled(label.trimmingCharacters(in: .whitespaces).isEmpty || !(computedAmount.map { $0 > 0 } ?? false))
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -416,7 +473,7 @@ private struct AddInstallmentView: View {
     }
 
     private func save() {
-        guard let amount = computedAmount, let rawValue = Decimal(string: valueText) else { return }
+        guard let amount = computedAmount, amount > 0, let rawValue = Decimal(string: valueText) else { return }
         let installment = PaymentInstallment(
             label: label.trimmingCharacters(in: .whitespaces),
             amount: amount,
@@ -465,6 +522,8 @@ private struct EditInstallmentView: View {
     var body: some View {
         NavigationStack {
             Form {
+                FinanceFormIntro(icon: "pencil", title: "Update this payment", detail: "Correct its amount, due time, or the exact date and time received.")
+                    .listRowBackground(Color.clear)
                 TextField("Label", text: $label)
                 HStack {
                     Text("Amount")
@@ -475,7 +534,7 @@ private struct EditInstallmentView: View {
                 }
                 Toggle("Due date", isOn: $hasDueDate)
                 if hasDueDate {
-                    DatePicker("Due", selection: $dueDate, displayedComponents: .date)
+                    DatePicker("Due", selection: $dueDate, displayedComponents: [.date, .hourAndMinute])
                 }
                 Toggle("Received", isOn: $isReceived)
                 if isReceived {
@@ -488,7 +547,7 @@ private struct EditInstallmentView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(label.trimmingCharacters(in: .whitespaces).isEmpty || Decimal(string: amountText) == nil)
+                        .disabled(label.trimmingCharacters(in: .whitespaces).isEmpty || !(Decimal(string: amountText).map { $0 > 0 } ?? false))
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -498,7 +557,7 @@ private struct EditInstallmentView: View {
     }
 
     private func save() {
-        guard let amount = Decimal(string: amountText) else { return }
+        guard let amount = Decimal(string: amountText), amount > 0 else { return }
         installment.label = label.trimmingCharacters(in: .whitespaces)
         installment.amount = amount
         // A directly-edited amount may no longer match the originally
@@ -541,6 +600,8 @@ private struct InstallmentReceivedView: View {
     var body: some View {
         NavigationStack {
             Form {
+                FinanceFormIntro(icon: "checkmark.circle", title: installment.isReceived ? "Correct receipt time" : "Record when it arrived", detail: "Choose the actual date and time. You can change this later.")
+                    .listRowBackground(Color.clear)
                 Section {
                     LabeledContent(installment.label, value: installment.amount.formatted(.currency(code: installment.project?.currencyCode ?? "USD")))
                     DatePicker("Received at", selection: $receivedDate, displayedComponents: [.date, .hourAndMinute])
@@ -603,6 +664,8 @@ private struct AddReimbursementView: View {
     var body: some View {
         NavigationStack {
             Form {
+                FinanceFormIntro(icon: "arrow.uturn.backward", title: "Track a client cost", detail: "Keep money you fronted separate from the payment for your work.")
+                    .listRowBackground(Color.clear)
                 TextField("What did you pay for? (e.g. Domain, VPS)", text: $title)
                 HStack {
                     Text("Amount")
@@ -611,7 +674,7 @@ private struct AddReimbursementView: View {
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
                 }
-                DatePicker("Date", selection: $date, displayedComponents: .date)
+                DatePicker("Paid at", selection: $date, displayedComponents: [.date, .hourAndMinute])
                 TextField("Note (optional)", text: $note)
             }
             .navigationTitle("Add Reimbursement")
@@ -619,7 +682,7 @@ private struct AddReimbursementView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || Decimal(string: amountText) == nil)
+                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || !(Decimal(string: amountText).map { $0 > 0 } ?? false))
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -629,7 +692,7 @@ private struct AddReimbursementView: View {
     }
 
     private func save() {
-        guard let amount = Decimal(string: amountText) else { return }
+        guard let amount = Decimal(string: amountText), amount > 0 else { return }
         let reimbursement = ProjectReimbursement(
             title: title.trimmingCharacters(in: .whitespaces),
             amount: amount,
@@ -657,6 +720,7 @@ private struct EditReimbursementView: View {
     @State private var amountText: String
     @State private var date: Date
     @State private var isRecovered: Bool
+    @State private var recoveredDate: Date
     @State private var note: String
 
     init(reimbursement: ProjectReimbursement) {
@@ -665,12 +729,15 @@ private struct EditReimbursementView: View {
         _amountText = State(initialValue: NSDecimalNumber(decimal: reimbursement.amount).stringValue)
         _date = State(initialValue: reimbursement.date)
         _isRecovered = State(initialValue: reimbursement.isRecovered)
+        _recoveredDate = State(initialValue: reimbursement.recoveredDate ?? .now)
         _note = State(initialValue: reimbursement.note ?? "")
     }
 
     var body: some View {
         NavigationStack {
             Form {
+                FinanceFormIntro(icon: "pencil", title: "Update this cost", detail: "Correct the amount or when the client paid you back.")
+                    .listRowBackground(Color.clear)
                 TextField("Title", text: $title)
                 HStack {
                     Text("Amount")
@@ -679,8 +746,11 @@ private struct EditReimbursementView: View {
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
                 }
-                DatePicker("Date", selection: $date, displayedComponents: .date)
+                DatePicker("Paid at", selection: $date, displayedComponents: [.date, .hourAndMinute])
                 Toggle("Recovered from client", isOn: $isRecovered)
+                if isRecovered {
+                    DatePicker("Recovered at", selection: $recoveredDate, displayedComponents: [.date, .hourAndMinute])
+                }
                 TextField("Note (optional)", text: $note)
             }
             .navigationTitle("Edit Reimbursement")
@@ -688,7 +758,7 @@ private struct EditReimbursementView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || Decimal(string: amountText) == nil)
+                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || !(Decimal(string: amountText).map { $0 > 0 } ?? false))
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -698,13 +768,11 @@ private struct EditReimbursementView: View {
     }
 
     private func save() {
-        guard let amount = Decimal(string: amountText) else { return }
+        guard let amount = Decimal(string: amountText), amount > 0 else { return }
         reimbursement.title = title.trimmingCharacters(in: .whitespaces)
         reimbursement.amount = amount
         reimbursement.date = date
-        if isRecovered != reimbursement.isRecovered {
-            reimbursement.recoveredDate = isRecovered ? .now : nil
-        }
+        reimbursement.recoveredDate = isRecovered ? recoveredDate : nil
         reimbursement.isRecovered = isRecovered
         reimbursement.note = note.isEmpty ? nil : note
         do {
@@ -743,6 +811,8 @@ private struct EditProjectView: View {
     var body: some View {
         NavigationStack {
             Form {
+                FinanceFormIntro(icon: "briefcase", title: "Refine the quote", detail: "Update the project details without changing its payment history.")
+                    .listRowBackground(Color.clear)
                 TextField("Project name", text: $name)
                 TextField("Client name (optional)", text: $clientName)
                 HStack {
@@ -763,7 +833,7 @@ private struct EditProjectView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || Decimal(string: totalText) == nil)
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || !(Decimal(string: totalText).map { $0 > 0 } ?? false))
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -779,7 +849,7 @@ private struct EditProjectView: View {
     }
 
     private func save() {
-        guard let total = Decimal(string: totalText) else { return }
+        guard let total = Decimal(string: totalText), total > 0 else { return }
         project.name = name.trimmingCharacters(in: .whitespaces)
         project.clientName = clientName.trimmingCharacters(in: .whitespaces).isEmpty ? nil : clientName
         project.totalAmount = total
