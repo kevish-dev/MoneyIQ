@@ -13,6 +13,7 @@ struct GoalsView: View {
 
     @State private var showingAddGoal = false
     @State private var goalsPendingDelete: [SavingsGoal]?
+    @State private var contributingGoal: SavingsGoal?
 
     private var currencyCode: String {
         authManager.currentAccount?.preferredCurrencyCode ?? "USD"
@@ -20,56 +21,139 @@ struct GoalsView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                if goals.isEmpty {
-                    emptyState
-                } else {
-                    ForEach(goals) { goal in
-                        NavigationLink {
-                            GoalDetailView(goal: goal, currencyCode: currencyCode)
-                        } label: {
-                            GoalRow(goal: goal, currencyCode: currencyCode)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    goalsHeader
+                    if goals.isEmpty {
+                        emptyState
+                    } else {
+                        if let nextGoal = goals.filter({ !$0.isComplete }).min(by: { $0.targetDate < $1.targetDate }) {
+                            nextGoalCard(nextGoal)
+                        }
+                        if goals.contains(where: { !$0.isComplete }) {
+                            sectionTitle("IN PROGRESS", count: goals.filter { !$0.isComplete }.count)
+                            ForEach(goals.filter { !$0.isComplete }) { goal in goalLink(goal) }
+                        }
+                        if goals.contains(where: \.isComplete) {
+                            sectionTitle("COMPLETED", count: goals.filter(\.isComplete).count)
+                            ForEach(goals.filter(\.isComplete)) { goal in goalLink(goal) }
                         }
                     }
-                    .onDelete { offsets in
-                        goalsPendingDelete = offsets.map { goals[$0] }
-                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 32)
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    showingAddGoal = true
+                } label: {
+                    Label("New savings goal", systemImage: "plus")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.glassProminent)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
             }
             .navigationTitle("Goals")
-            .compactListLayout()
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
                     ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
                 }
-                ToolbarItem {
-                    Button {
-                        showingAddGoal = true
-                    } label: {
-                        Label("Add Goal", systemImage: "plus")
-                    }
-                }
             }
-            .sheet(isPresented: $showingAddGoal) {
-                AddGoalView(currencyCode: currencyCode)
-            }
+            .sheet(isPresented: $showingAddGoal) { AddGoalView(currencyCode: currencyCode) }
+            .sheet(item: $contributingGoal) { goal in AddContributionView(goal: goal) }
             .alert(
-                "Delete \(goalsPendingDelete?.count == 1 ? (goalsPendingDelete?.first?.name ?? "Goal") : "\(goalsPendingDelete?.count ?? 0) Goals")?",
+                "Delete \(goalsPendingDelete?.first?.name ?? "Goal")?",
                 isPresented: Binding(
                     get: { goalsPendingDelete != nil },
                     set: { if !$0 { goalsPendingDelete = nil } }
                 )
             ) {
                 Button("Delete", role: .destructive) {
-                    for goal in goalsPendingDelete ?? [] {
-                        modelContext.delete(goal)
-                    }
+                    for goal in goalsPendingDelete ?? [] { modelContext.delete(goal) }
                     try? modelContext.save()
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This also deletes all its contributions. This can't be undone.")
             }
+        }
+    }
+
+    private var goalsHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("MAKE ROOM FOR WHAT'S NEXT")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .tracking(2)
+                .foregroundStyle(.white.opacity(0.78))
+            Text("Your goals,\nin motion.")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            HStack(spacing: 12) {
+                Label("\(goals.filter { !$0.isComplete }.count) active", systemImage: "circle.dotted")
+                Label("\(goals.filter(\.isComplete).count) reached", systemImage: "checkmark.seal")
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(24)
+        .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: 26))
+    }
+
+    private func nextGoalCard(_ goal: SavingsGoal) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text("NEXT MILESTONE")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .tracking(1.5)
+                .foregroundStyle(AppTheme.accent)
+            HStack {
+                Text(goal.name).font(.title3.bold())
+                Spacer()
+                Text(goal.targetDate, format: .dateTime.month(.abbreviated).day())
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            Text("\(goal.remainingAmount.formatted(.currency(code: goal.currencyCode))) to go")
+                .font(.subheadline)
+            HStack {
+                Text("\(goal.suggestedMonthlyContribution().formatted(.currency(code: goal.currencyCode)))/month keeps you on track")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            Button { contributingGoal = goal } label: {
+                Label("Add funds", systemImage: "plus")
+            }
+            .buttonStyle(.glassProminent)
+        }
+        .padding(18)
+        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+    }
+
+    private func sectionTitle(_ title: String, count: Int) -> some View {
+        HStack {
+            Text(title).tracking(1.6)
+            Spacer()
+            Text("\(count)")
+        }
+        .font(.system(size: 11, weight: .bold, design: .rounded))
+        .foregroundStyle(.secondary)
+    }
+
+    private func goalLink(_ goal: SavingsGoal) -> some View {
+        NavigationLink {
+            GoalDetailView(goal: goal, currencyCode: goal.currencyCode)
+        } label: {
+            GoalRow(goal: goal, currencyCode: goal.currencyCode)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button { contributingGoal = goal } label: { Label("Add Funds", systemImage: "plus") }
+            Button(role: .destructive) { goalsPendingDelete = [goal] } label: { Label("Delete", systemImage: "trash") }
         }
     }
 
@@ -86,8 +170,8 @@ struct GoalsView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .listRowBackground(Color.clear)
+        .padding(24)
+        .glassEffect(.regular, in: .rect(cornerRadius: 22))
     }
 
 }
@@ -113,7 +197,8 @@ private struct GoalRow: View {
                 .foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, AppTheme.Spacing.small)
+        .padding(16)
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
     }
 }
 
@@ -128,37 +213,83 @@ private struct GoalDetailView: View {
     @State private var editingContribution: SavingsContribution?
     @State private var deletingContribution: SavingsContribution?
 
+    private var goalFacts: [String] {
+        [
+            "Goal: \(goal.name)",
+            "Target: \(goal.targetAmount.formatted(.currency(code: currencyCode))) by \(goal.targetDate.formatted(date: .abbreviated, time: .omitted))",
+            "Saved: \(goal.savedAmount.formatted(.currency(code: currencyCode)))",
+            "Remaining: \(goal.remainingAmount.formatted(.currency(code: currencyCode)))",
+            "Suggested monthly contribution: \(goal.suggestedMonthlyContribution().formatted(.currency(code: currencyCode)))",
+            "Contributions: \(goal.contributions.count)"
+        ] + goal.contributions.sorted { $0.date > $1.date }.prefix(5).map {
+            "Contribution on \($0.date.formatted(date: .abbreviated, time: .omitted)): \($0.amount.formatted(.currency(code: currencyCode)))"
+        }
+    }
+
     var body: some View {
-        List {
-            Section {
-                VStack(alignment: .leading, spacing: 10) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label(goal.name, systemImage: goal.systemIconName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85))
                     Text(goal.savedAmount, format: .currency(code: currencyCode))
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                    Text("of \(goal.targetAmount.formatted(.currency(code: currencyCode))) goal")
+                        .font(.system(size: 38, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text("of \(goal.targetAmount.formatted(.currency(code: currencyCode))) saved")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.8))
                     ProgressView(value: goal.progressFraction)
-                        .tint(goal.isComplete ? .green : .accentColor)
-
-                    if !goal.isComplete {
-                        Text("Save \(goal.suggestedMonthlyContribution().formatted(.currency(code: currencyCode)))/month to hit your goal by \(goal.targetDate.formatted(.dateTime.month(.wide).year()))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Label("Goal reached!", systemImage: "checkmark.seal.fill")
-                            .foregroundStyle(.green)
-                    }
+                        .tint(.white)
+                    Text(goal.isComplete ? "Goal reached" : "\(goal.remainingAmount.formatted(.currency(code: currencyCode))) left by \(goal.targetDate.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
                 }
-                .padding(.vertical, 8)
-            }
+                .padding(22)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: 24))
 
-            Section("Contributions") {
+                if !goal.isComplete {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("A steady way there").font(.headline)
+                            Text("\(goal.suggestedMonthlyContribution().formatted(.currency(code: currencyCode))) each month")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "calendar.badge.clock").foregroundStyle(AppTheme.accent)
+                    }
+                    .padding(16)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 18))
+                }
+
+                LocalIntelligenceCard(
+                    title: "Plan this goal",
+                    subtitle: "Explore your pace with the on-device model",
+                    facts: goalFacts,
+                    suggestions: ["Am I on pace?", "What should I contribute next month?"]
+                )
+
+                HStack {
+                    Text("CONTRIBUTIONS").tracking(1.5)
+                    Spacer()
+                    Text("\(goal.contributions.count)")
+                }
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
                 if goal.contributions.isEmpty {
-                    Text("No contributions yet.")
-                        .foregroundStyle(.secondary)
+                    Text("Your contributions will appear here. Add the first one to start tracking progress.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .padding(18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .glassEffect(.regular, in: .rect(cornerRadius: 18))
                 }
                 ForEach(goal.contributions.sorted { $0.date > $1.date }) { contribution in
-                    HStack {
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.down.left")
+                            .foregroundStyle(.green)
+                            .frame(width: 34, height: 34)
+                            .glassEffect(.regular, in: .circle)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(contribution.date, format: .dateTime.month().day().year().hour().minute())
                             if let note = contribution.note {
@@ -166,9 +297,11 @@ private struct GoalDetailView: View {
                             }
                         }
                         Spacer()
-                        Text(contribution.amount, format: .currency(code: currencyCode))
+                        Text(contribution.amount, format: .currency(code: currencyCode)).fontWeight(.semibold)
                     }
-                    .contentShape(Rectangle())
+                    .padding(14)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 18))
+                    .onTapGesture { editingContribution = contribution }
                     .contextMenu {
                         Button {
                             editingContribution = contribution
@@ -183,22 +316,28 @@ private struct GoalDetailView: View {
                     }
                 }
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 30)
+        }
+        .safeAreaInset(edge: .bottom) {
+            Button { showingContribute = true } label: {
+                Label("Add funds", systemImage: "plus")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            }
+            .buttonStyle(.glassProminent)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
         }
         .navigationTitle(goal.name)
-        .compactListLayout()
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem {
                 Button {
                     showingEditGoal = true
                 } label: {
                     Label("Edit Goal", systemImage: "pencil")
-                }
-            }
-            ToolbarItem {
-                Button {
-                    showingContribute = true
-                } label: {
-                    Label("Add Funds", systemImage: "plus")
                 }
             }
         }
