@@ -10,6 +10,7 @@ struct InsightsView: View {
     let lockManager: AppLockManager
 
     @Query(sort: \ExpenseTransaction.date) private var transactions: [ExpenseTransaction]
+    @Query(sort: \Budget.createdAt, order: .reverse) private var budgets: [Budget]
 
     /// The month currently being viewed — defaults to the current month,
     /// but every section below re-derives from this instead of `.now`, so
@@ -80,6 +81,34 @@ struct InsightsView: View {
         )
     }
 
+    private var insightFacts: [String] {
+        var facts = [
+            "Period: \(selectedMonth.formatted(.dateTime.month(.wide).year()))",
+            "Currency: \(currencyCode)",
+            "Total spent in period: \(monthTotalSpend.formatted(.currency(code: currencyCode)))",
+            "Previous month total: \(monthChange.previousTotal.formatted(.currency(code: currencyCode)))",
+            "Transactions in period: \(transactions.filter { calendar.isDate($0.date, equalTo: selectedMonth, toGranularity: .month) }.count)"
+        ]
+        if let change = monthChange.percentChange {
+            facts.append("Change from previous month: \(change.formatted(.percent.precision(.fractionLength(1))))")
+        }
+        facts += categoryShares.prefix(6).map { "Category \($0.categoryName): \($0.total.formatted(.currency(code: currencyCode))), \($0.fraction.formatted(.percent.precision(.fractionLength(0)))) of spend" }
+        facts += topMerchants.prefix(4).map { "Merchant \($0.merchantName): \($0.total.formatted(.currency(code: currencyCode))) in \($0.occurrences) transactions" }
+        facts += anomalies.prefix(3).map { "Unusual transaction \($0.transaction.merchantName ?? "Unknown merchant"): \($0.transaction.amount.formatted(.currency(code: currencyCode)))" }
+        if isCurrentMonth {
+            facts.append("Monthly income: \(forecast.monthlyIncome.formatted(.currency(code: currencyCode)))")
+            facts.append("Upcoming recurring bills estimate: \(forecast.upcomingBillsTotal.formatted(.currency(code: currencyCode)))")
+            if forecast.monthlyIncome > 0 {
+                facts.append("Projected end-of-month balance: \(forecast.projectedEndOfMonthBalance.formatted(.currency(code: currencyCode)))")
+            }
+            if let budget = budgets.first {
+                let progress = BudgetEngine.monthProgress(for: budget, transactions: transactions)
+                facts.append("Monthly budget: \(budget.monthlyCapAmount.formatted(.currency(code: currencyCode))); remaining: \(progress.remaining.formatted(.currency(code: currencyCode)))")
+            }
+        }
+        return facts
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -88,7 +117,14 @@ struct InsightsView: View {
                     if transactions.isEmpty {
                         emptyState
                     } else {
+                        editorialHeader
                         spendTrendCard
+                        LocalIntelligenceCard(
+                            title: "Ask your spending",
+                            subtitle: "A private explanation of the numbers on this page",
+                            facts: insightFacts,
+                            suggestions: ["What changed this month?", "Where can I look more closely?", "Summarize my spending"]
+                        )
                         if isCurrentMonth {
                             cashFlowCard
                         } else {
@@ -116,6 +152,22 @@ struct InsightsView: View {
 
     // MARK: - Month navigation
 
+    private var editorialHeader: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("YOUR MONEY, IN FOCUS")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .tracking(2)
+                .foregroundStyle(AppTheme.accent)
+            Text("See the story behind the spend.")
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Explore a month, spot patterns, then ask a better question.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 8)
+    }
+
     private var monthNavigator: some View {
         HStack {
             Button {
@@ -123,7 +175,7 @@ struct InsightsView: View {
                     selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
                 }
             } label: {
-                Image(systemName: "chevron.left.circle.fill")
+            Image(systemName: "chevron.left")
                     .font(.title2)
                     .foregroundStyle(AppTheme.accent)
             }
@@ -141,13 +193,15 @@ struct InsightsView: View {
                     selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
                 }
             } label: {
-                Image(systemName: "chevron.right.circle.fill")
+            Image(systemName: "chevron.right")
                     .font(.title2)
                     .foregroundStyle(canGoToNextMonth ? AppTheme.accent : Color.secondary.opacity(0.3))
             }
             .disabled(!canGoToNextMonth)
         }
-        .padding(.top, AppTheme.Spacing.xs)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .glassEffect(.regular, in: .capsule)
     }
 
     private var emptyState: some View {
@@ -196,7 +250,7 @@ struct InsightsView: View {
             }
         }
         .padding(AppTheme.Spacing.large)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
     }
 
     private func forecastStat(_ label: String, _ value: Decimal) -> some View {
@@ -229,7 +283,7 @@ struct InsightsView: View {
             }
         }
         .padding(AppTheme.Spacing.large)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
     }
 
     /// Dark red-to-orange hero card: current-period total over a smooth
@@ -296,7 +350,7 @@ struct InsightsView: View {
                                 }
                                 .padding(12)
                                 .frame(width: 140, alignment: .leading)
-                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .glassEffect(.regular, in: .rect(cornerRadius: 14))
                             }
                         }
                     }
@@ -304,7 +358,7 @@ struct InsightsView: View {
             }
         }
         .padding(AppTheme.Spacing.large)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
+        .glassEffect(.regular, in: .rect(cornerRadius: AppTheme.cardCornerRadius))
     }
 
     private var topMerchantsSection: some View {
@@ -324,7 +378,7 @@ struct InsightsView: View {
                         .font(.subheadline.weight(.semibold))
                 }
                 .padding(12)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .glassEffect(.regular, in: .rect(cornerRadius: 12))
             }
         }
     }
@@ -348,7 +402,7 @@ struct InsightsView: View {
                         .font(.subheadline.weight(.semibold))
                 }
                 .padding(12)
-                .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .glassEffect(.regular.tint(.red.opacity(0.10)), in: .rect(cornerRadius: 12))
             }
         }
     }
@@ -370,7 +424,7 @@ struct InsightsView: View {
                         .font(.subheadline.weight(.semibold))
                 }
                 .padding(12)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .glassEffect(.regular, in: .rect(cornerRadius: 12))
             }
         }
     }
