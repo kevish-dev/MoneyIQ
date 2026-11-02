@@ -16,6 +16,7 @@ public enum UPIPaymentMessageParser {
     private static let debit = regex(#"\b(?:debited|spent|paid|sent)\b"#)
     private static let unsafeStatus = regex(#"\b(?:credited|refunded|refund|reversed|reversal|failed|declined|unsuccessful|pending|mandate|request)\b"#)
     private static let currency = regex(#"(?:₹|\bRs\.?|\bINR)\s*([0-9]{1,3}(?:,[0-9]{2,3})+|[0-9]{1,9})(?:\.([0-9]{1,2}))?(?![0-9])"#)
+    private static let amountContextLabel = regex(#"\b(?:balance|bal|avl|available|amount|amt|paid|debited|spent|sent)\b"#)
     private static let reference = regex(#"\b(?:upi\s*(?:ref(?:erence)?\s*(?:no\.?|number|id)?|id)|utr|rrn|txn\s*id)\s*[:#./-]?\s*([a-z0-9]{8,30})\b"#)
     private static let payee = regex(#"\b(?:to|towards|at)\s+([a-z][a-z0-9 .&@_-]{1,48})"#)
 
@@ -28,6 +29,7 @@ public enum UPIPaymentMessageParser {
         // Bank messages often contain both the debit and the available
         // balance. Use the currency amount closest to the debit verb.
         let amountMatch = currency.matches(in: text, range: range)
+            .filter { !isBalanceAmount($0, in: text) }
             .min { distance($0.range, to: debitMatch.range) < distance($1.range, to: debitMatch.range) }
         guard let amountMatch,
               distance(amountMatch.range, to: debitMatch.range) <= 80,
@@ -71,8 +73,19 @@ public enum UPIPaymentMessageParser {
         name = name.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
         guard (2...40).contains(name.count),
               !name.lowercased().hasPrefix("your "),
-              !name.lowercased().hasPrefix("a/c") else { return nil }
+              !name.lowercased().hasPrefix("a/c"),
+              !["upi", "vpa"].contains(name.lowercased()) else { return nil }
         return name
+    }
+
+    private static func isBalanceAmount(_ match: NSTextCheckingResult, in text: String) -> Bool {
+        let nsText = text as NSString
+        let start = max(0, match.range.location - 28)
+        let prefix = nsText.substring(with: NSRange(location: start, length: match.range.location - start))
+        let range = NSRange(prefix.startIndex..<prefix.endIndex, in: prefix)
+        guard let lastLabel = amountContextLabel.matches(in: prefix, range: range).last,
+              let labelRange = Range(lastLabel.range, in: prefix) else { return false }
+        return ["balance", "bal", "avl", "available"].contains(prefix[labelRange].lowercased())
     }
 
     private static func distance(_ a: NSRange, to b: NSRange) -> Int {

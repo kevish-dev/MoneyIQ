@@ -18,6 +18,11 @@ struct UPIPaymentMessageParserTests {
         #expect(UPIPaymentMessageParser.parse("UPI payment request of INR 80 pending") == nil)
     }
 
+    @Test func ignoresBalanceEvenWhenItIsCloserToDebitWord() {
+        let message = "UPI debited from a/c. Avl Bal INR 900. Amount INR 75 to Corner Shop"
+        #expect(UPIPaymentMessageParser.parse(message)?.amount == 75)
+    }
+
     @Test func sameReferenceIsIdempotentAcrossMessageFormats() {
         let first = UPIPaymentMessageParser.parse("INR 80 paid via UPI to Cafe. UPI Ref No 123456789012")!
         let second = UPIPaymentMessageParser.parse("UPI Ref No 123456789012: INR 80 debited to Cafe")!
