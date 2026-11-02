@@ -121,6 +121,9 @@ struct ProjectsView: View {
     }
 
     private func nextPaymentCard(_ installment: PaymentInstallment) -> some View {
+        NavigationLink {
+            if let project = installment.project { ProjectDetailView(project: project) }
+        } label: {
         VStack(alignment: .leading, spacing: 10) {
             Text("NEXT PAYMENT")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -143,6 +146,8 @@ struct ProjectsView: View {
         }
         .padding(18)
         .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        }
+        .buttonStyle(.plain)
     }
 
     private func sectionTitle(_ title: String, count: Int) -> some View {
