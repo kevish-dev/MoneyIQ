@@ -121,6 +121,7 @@ public struct ExpenseTransactionDTO: Codable {
     public var categoryID: UUID?
     public var createdAt: Date
     public var editedAt: Date?
+    public var importFingerprint: String?
 }
 
 public struct BudgetDTO: Codable {

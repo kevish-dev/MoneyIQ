@@ -98,7 +98,8 @@ public enum BackupManager {
                 ExpenseTransactionDTO(
                     id: $0.id, amount: $0.amount, date: $0.date, note: $0.note, merchantName: $0.merchantName,
                     paymentMethod: $0.paymentMethod, isAutoImported: $0.isAutoImported, isBillLike: $0.isBillLike,
-                    categoryID: $0.category?.id, createdAt: $0.createdAt, editedAt: $0.editedAt
+                    categoryID: $0.category?.id, createdAt: $0.createdAt, editedAt: $0.editedAt,
+                    importFingerprint: $0.importFingerprint
                 )
             },
             budgets: budgets.map {
@@ -216,7 +217,8 @@ public enum BackupManager {
             let transaction = ExpenseTransaction(
                 id: dto.id, amount: dto.amount, date: dto.date, note: dto.note, merchantName: dto.merchantName,
                 paymentMethod: dto.paymentMethod, isAutoImported: dto.isAutoImported, isBillLike: dto.isBillLike,
-                category: dto.categoryID.flatMap { categoriesByID[$0] }, createdAt: dto.createdAt, editedAt: dto.editedAt
+                category: dto.categoryID.flatMap { categoriesByID[$0] }, createdAt: dto.createdAt,
+                editedAt: dto.editedAt, importFingerprint: dto.importFingerprint
             )
             context.insert(transaction)
         }

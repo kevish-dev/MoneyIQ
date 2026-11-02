@@ -24,6 +24,10 @@ public final class ExpenseTransaction {
     /// until then. Drives the "edited" indicator in the transaction list.
     public var editedAt: Date?
 
+    /// Hash of the source payment message for idempotent Shortcuts imports.
+    /// Optional so existing SwiftData stores migrate without a backfill.
+    public var importFingerprint: String?
+
     /// Set when a screenshot/ML pipeline produced this transaction (Phase 3).
     /// Left false for manual entries.
     public var isAutoImported: Bool
@@ -45,7 +49,8 @@ public final class ExpenseTransaction {
         isBillLike: Bool = false,
         category: ExpenseCategory? = nil,
         createdAt: Date = .now,
-        editedAt: Date? = nil
+        editedAt: Date? = nil,
+        importFingerprint: String? = nil
     ) {
         self.id = id
         self.amount = amount
@@ -58,5 +63,6 @@ public final class ExpenseTransaction {
         self.category = category
         self.createdAt = createdAt
         self.editedAt = editedAt
+        self.importFingerprint = importFingerprint
     }
 }

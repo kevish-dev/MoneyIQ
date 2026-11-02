@@ -19,7 +19,10 @@ struct BackupManagerTests {
         identity.account = account
         sourceContext.insert(identity)
 
-        let transaction = ExpenseTransaction(amount: 499, note: "Lunch", merchantName: "Cafe", category: category)
+        let transaction = ExpenseTransaction(
+            amount: 499, note: "Lunch", merchantName: "Cafe", category: category,
+            importFingerprint: "sample-message-hash"
+        )
         sourceContext.insert(transaction)
 
         let budget = Budget(monthlyCapAmount: 20000, currencyCode: "INR")
@@ -72,6 +75,7 @@ struct BackupManagerTests {
         let restoredTransactions = try destinationContext.fetch(FetchDescriptor<ExpenseTransaction>())
         #expect(restoredTransactions.first?.amount == 499)
         #expect(restoredTransactions.first?.category?.name == "Food")
+        #expect(restoredTransactions.first?.importFingerprint == "sample-message-hash")
 
         let restoredIdentities = try destinationContext.fetch(FetchDescriptor<LinkedIdentity>())
         #expect(restoredIdentities.first?.account?.email == "ada@example.com")
