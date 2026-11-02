@@ -389,6 +389,8 @@ private struct AddContributionView: View {
     var body: some View {
         NavigationStack {
             Form {
+                FinanceFormIntro(icon: "plus.circle", title: "Put money toward \(goal.name)", detail: "Record the amount, time, and an optional note. Your progress updates immediately.")
+                    .listRowBackground(Color.clear)
                 HStack {
                     Text("Amount")
                     Spacer()
@@ -404,7 +406,7 @@ private struct AddContributionView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(Decimal(string: amountText) == nil)
+                        .disabled(!(Decimal(string: amountText).map { $0 > 0 } ?? false))
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -414,7 +416,7 @@ private struct AddContributionView: View {
     }
 
     private func save() {
-        guard let amount = Decimal(string: amountText) else { return }
+        guard let amount = Decimal(string: amountText), amount > 0 else { return }
         let contribution = SavingsContribution(amount: amount, date: date, note: note.isEmpty ? nil : note, goal: goal)
         modelContext.insert(contribution)
         goal.savedAmount += amount
@@ -449,6 +451,8 @@ private struct EditContributionView: View {
     var body: some View {
         NavigationStack {
             Form {
+                FinanceFormIntro(icon: "pencil", title: "Correct a contribution", detail: "Changing the amount also updates the goal's saved total.")
+                    .listRowBackground(Color.clear)
                 HStack {
                     Text("Amount")
                     Spacer()
@@ -464,7 +468,7 @@ private struct EditContributionView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(Decimal(string: amountText) == nil)
+                        .disabled(!(Decimal(string: amountText).map { $0 > 0 } ?? false))
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -474,7 +478,7 @@ private struct EditContributionView: View {
     }
 
     private func save() {
-        guard let amount = Decimal(string: amountText) else { return }
+        guard let amount = Decimal(string: amountText), amount > 0 else { return }
         // `savedAmount` is a running total, not re-summed from contributions
         // (see SavingsGoal's doc comment) — adjust it by the delta rather
         // than just overwriting the contribution's amount.
@@ -519,6 +523,8 @@ private struct EditGoalView: View {
     var body: some View {
         NavigationStack {
             Form {
+                FinanceFormIntro(icon: "target", title: "Shape your goal", detail: "Set a clear amount and date. MoneyIQ will show a monthly pace based on what you've saved.")
+                    .listRowBackground(Color.clear)
                 TextField("Goal name (e.g. Trip to Goa)", text: $name)
                 HStack {
                     Text("Target amount")
@@ -543,7 +549,7 @@ private struct EditGoalView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || Decimal(string: targetText) == nil)
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || !(Decimal(string: targetText).map { $0 > 0 } ?? false))
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -559,7 +565,7 @@ private struct EditGoalView: View {
     }
 
     private func save() {
-        guard let target = Decimal(string: targetText) else { return }
+        guard let target = Decimal(string: targetText), target > 0 else { return }
         goal.name = name.trimmingCharacters(in: .whitespaces)
         goal.targetAmount = target
         goal.targetDate = targetDate
@@ -600,6 +606,8 @@ private struct AddGoalView: View {
     var body: some View {
         NavigationStack {
             Form {
+                FinanceFormIntro(icon: "target", title: "Choose what matters", detail: "A name, target amount, and date are enough to get started.")
+                    .listRowBackground(Color.clear)
                 TextField("Goal name (e.g. Trip to Goa)", text: $name)
                 HStack {
                     Text("Target amount")
@@ -620,7 +628,7 @@ private struct AddGoalView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(name.isEmpty || Decimal(string: targetText) == nil)
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || !(Decimal(string: targetText).map { $0 > 0 } ?? false))
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -630,8 +638,8 @@ private struct AddGoalView: View {
     }
 
     private func save() {
-        guard let target = Decimal(string: targetText) else { return }
-        let goal = SavingsGoal(name: name, targetAmount: target, targetDate: targetDate, currencyCode: currencyCode, systemIconName: icon)
+        guard let target = Decimal(string: targetText), target > 0 else { return }
+        let goal = SavingsGoal(name: name.trimmingCharacters(in: .whitespaces), targetAmount: target, targetDate: targetDate, currencyCode: currencyCode, systemIconName: icon)
         modelContext.insert(goal)
         try? modelContext.save()
         dismiss()

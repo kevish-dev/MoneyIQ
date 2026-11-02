@@ -246,6 +246,8 @@ private struct AddProjectView: View {
     var body: some View {
         NavigationStack {
             Form {
+                FinanceFormIntro(icon: "briefcase", title: "Start with the quote", detail: "Give the project a name and total. Add milestone payments as the work progresses.")
+                    .listRowBackground(Color.clear)
                 TextField("Project name (e.g. Website Redesign)", text: $name)
                 TextField("Client name (optional)", text: $clientName)
                 HStack {
@@ -262,7 +264,7 @@ private struct AddProjectView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || Decimal(string: totalText) == nil)
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || !(Decimal(string: totalText).map { $0 > 0 } ?? false))
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -272,7 +274,7 @@ private struct AddProjectView: View {
     }
 
     private func save() {
-        guard let total = Decimal(string: totalText) else { return }
+        guard let total = Decimal(string: totalText), total > 0 else { return }
         let project = FreelanceProject(
             name: name.trimmingCharacters(in: .whitespaces),
             clientName: clientName.trimmingCharacters(in: .whitespaces).isEmpty ? nil : clientName,
