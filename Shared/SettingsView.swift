@@ -20,6 +20,7 @@ struct SettingsView: View {
         Form {
             securitySection
             notificationsSection
+            importSection
             dataSection
             accountSection
         }
@@ -110,6 +111,20 @@ struct SettingsView: View {
             Text("Data")
         } footer: {
             Text("Export your data so it survives an uninstall, or restore it on a new device.")
+        }
+    }
+
+    private var importSection: some View {
+        Section {
+            NavigationLink {
+                UPIAutomationSetupView()
+            } label: {
+                Label("Automatic UPI import", systemImage: "arrow.down.message")
+            }
+        } header: {
+            Text("Expense capture")
+        } footer: {
+            Text("Connect a bank debit SMS through Shortcuts to log eligible UPI payments automatically.")
         }
     }
 

@@ -78,5 +78,13 @@ public struct MoneyIQShortcuts: AppShortcutsProvider {
             shortTitle: "Log Expense",
             systemImageName: "creditcard"
         )
+        AppShortcut(
+            intent: ImportUPIPaymentIntent(),
+            phrases: [
+                "Import a UPI debit in \(.applicationName)"
+            ],
+            shortTitle: "Import UPI Debit",
+            systemImageName: "arrow.down.doc"
+        )
     }
 }

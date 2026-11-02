@@ -82,6 +82,14 @@ below.
   amount, merchant, and date. The image is only ever held in memory for
   parsing — nothing is written to disk or uploaded. A review screen lets you
   confirm or correct every field before it's saved as a real transaction.
+- **Optional UPI debit SMS automation.** Settings → Automatic UPI import
+  explains how to connect a bank's debit messages to the “Import UPI Debit”
+  Shortcuts action. Clear UPI debits are saved locally; credits, failed
+  payments, and repeat messages are skipped. A source fingerprint is stored
+  to avoid repeat imports, and backup/restore preserves it. This depends on
+  the bank sending a suitable SMS and on a personal automation configured
+  on that iPhone. MoneyIQ cannot directly observe Google Pay, PhonePe, or
+  Slice transactions or read those apps' notifications.
 - **Auto-detect bills.** Screenshots whose text matches bill-like keywords
   (EMI, recharge, electricity, subscription, rent, etc.) are flagged as
   recurring bills automatically.

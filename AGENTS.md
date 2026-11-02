@@ -34,11 +34,12 @@ reads it without accessing the app's SwiftData store. The group's entitlement
 was accepted by the free personal-team device build. Action widgets deep-link
 into clipboard import, screenshot import, and manual expense entry.
 
-One feature exists **outside the PRD**: **Split**, a person-to-person IOU/
-settle-up tracker (`LedgerContact`/`LedgerEntry`/`LedgerEngine`), added by
-explicit user request, not part of the original phased plan. If the PRD and
-the code disagree about Split, the code wins — the PRD was never updated to
-mention it.
+Two features exist **outside the PRD**: **Split**, a person-to-person IOU/
+settle-up tracker (`LedgerContact`/`LedgerEntry`/`LedgerEngine`), and an
+optional **UPI debit SMS automation** (`UPIPaymentMessageParser`/
+`ImportUPIPaymentIntent`). The latter receives text from a user-created
+Shortcuts Message trigger; it cannot observe payments inside another app.
+If the PRD and code disagree about either feature, the code wins.
 
 ## Architecture
 
