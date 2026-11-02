@@ -20,13 +20,19 @@ how to run it.
 ## Project status (as of the last commit touching this file)
 
 **Every PRD phase (1–7) that doesn't strictly need CloudKit is done.**
-What's left — shared/family budgets, Handoff, cross-device sync, Home
-Screen widgets, push notifications — all trace back to two things:
-**CloudKit** and the **App Groups** entitlement, both gated behind the paid
-Apple Developer Program, which this project doesn't have. Nothing else is
+What's left — shared/family budgets, Handoff, cross-device sync, and push
+notifications — depends on CloudKit or APNs, gated behind the paid Apple
+Developer Program, which this project doesn't have. Nothing else is
 blocking further free-tier work; if you're picking this up and there's no
 paid account yet, look at what's *not* CloudKit/App-Groups-shaped before
 assuming something needs to wait.
+
+Free-team Home and Lock Screen widgets show aggregate monthly spending,
+budget progress, today's total, and the top category. `WidgetSnapshotBridge`
+publishes a small snapshot into a shared Keychain access group; the extension
+reads it without accessing the app's SwiftData store. The group's entitlement
+was accepted by the free personal-team device build. Action widgets deep-link
+into clipboard import, screenshot import, and manual expense entry.
 
 One feature exists **outside the PRD**: **Split**, a person-to-person IOU/
 settle-up tracker (`LedgerContact`/`LedgerEntry`/`LedgerEngine`), added by
@@ -44,7 +50,8 @@ mention it.
   (not a framework — just source files via `project.yml`'s `sources:`).
 - `iOS/MoneyIQ/` — thin app entry point (`@main` struct +
   `ModelContainer` wiring). Almost nothing platform-specific lives here.
-- `iOS/MoneyIQWidgets/` — the widget extension hosting the Live Activity.
+- `iOS/MoneyIQWidgets/` — the widget extension hosting data and action widgets and
+  the Live Activity.
   ActivityKit is iOS-only.
 - `project.yml` — [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec.
   **The `.xcodeproj` is generated and gitignored.** Never hand-edit it —
@@ -118,8 +125,10 @@ Empirically verified, not assumed:
 - **Live Activities** do **not**, when the widget extension is only
   updated locally by the app itself (`Activity.update`, no push). A
   genuine `app-extension` target, code-signed successfully on a free
-  team. Only *Home Screen widgets* (a different WidgetKit surface, reading
-  shared data across a real process boundary) need App Groups.
+  team. Data-backed Home/Lock widgets in this repo use a shared Keychain access
+  group for aggregate figures; personal-team profiles accepted that entitlement
+  while rejecting the App Groups entitlement. Keep the app and widget group
+  identifiers aligned in `project.yml` and their entitlements files.
 - **CloudKit**, **CloudKit shared zones**, and **APNs push** are correctly
   marked as needing it — those are real.
 

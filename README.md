@@ -43,9 +43,8 @@ order — a feature only starts once whatever it needs already exists.
 This repo currently implements **every phase of the PRD that doesn't
 strictly need CloudKit** — Phases 1 through 7, at least in the slice that
 doesn't require a paid Apple Developer Program membership. What's left
-(shared/family budgets, Handoff, cross-device sync, Home Screen widgets,
-push notifications) all trace back to the same two things: CloudKit and the
-App Groups entitlement, both paid-gated — see
+(shared/family budgets, Handoff, cross-device sync, and push notifications)
+all trace back to CloudKit or APNs, which need a paid developer account — see
 [Roadmap / deferred work](#roadmap--deferred-work-needs-a-paid-apple-developer-program)
 below.
 
@@ -110,6 +109,11 @@ below.
   a progress bar; toggling rollover carries last month's *unused* amount
   into this month's effective cap (overspending never carries forward as a
   debt — only one month back, not a compounding chain).
+- **Home dashboard.** The monthly spending card shows the total, remaining
+  budget, and cap. Manual entry, clipboard import, and screenshot import are
+  separate one-tap actions even when no budget exists. Today's spending and
+  the top category sit above recent activity; tap a transaction to edit it,
+  or use the toolbar to search and filter.
 - **Goal-based savings.** Set a target amount and date ("Save ₹50,000 for a
   trip by December"), log contributions, and see progress plus a suggested
   monthly amount to stay on track.
@@ -130,6 +134,22 @@ below.
   and `ActivityKit`, kept in sync with real spend/cap data whenever it
   changes. Entirely local — the app itself calls `Activity.update`, no
   APNs/push needed for this on-device usage.
+- **Home and Lock Screen widgets.** Monthly Spending shows the current month's
+  total, budget progress, and remaining amount; Today's Spending shows the
+  daily total and budget pace; Top Spending Category shows the leading category.
+  Lock Screen versions show the same figures in circular, rectangular, and
+  inline layouts. A medium widget combines today's total with three expense
+  actions. The app publishes only aggregate figures through a shared Keychain
+  access group accepted by the free personal signing team. Figures update when
+  transactions or budgets change in the app and refresh at the next day boundary.
+  A dedicated Paste Expense widget opens
+  MoneyIQ, reads a copied payment message or receipt image, and presents the
+  parsed expense for review before saving. A separate Screenshot widget opens
+  the screenshot picker, reads the chosen image on-device, and shows the
+  expense for review. The action widgets also open manual entry. They use
+  deep links and work with a free personal signing team. The Dynamic Island's expanded and
+  compact Live Activity layouts show budget, savings, or daily pace with
+  clearer status and overflow handling.
 - **A worth-flagging finding:** the PRD's own dependency table marks Siri/App
   Intents and Live Activities as needing the paid Developer Program. Empirically,
   neither did — both build, code-sign, and run on this repo's free personal
@@ -153,12 +173,15 @@ below.
   math. "Settle Up" prefills the exact amount needed to zero the balance,
   editable for a partial settlement. A `Split` tab lists every contact with
   their live balance; tapping one shows the full history as an audit trail.
+  The tab shows both money to receive and money owed, with direct Add Person
+  and Split a Bill actions. A person's screen exposes Add Entry and Settle Up;
+  entries open for editing on tap. Entry forms preview the resulting balance,
+  and the bill form shows the exact rounded share for every participant before
+  saving.
 - **Fully offline** — no CloudKit sync yet, everything lives in a local
   SwiftData store (`cloudKitDatabase: .none`).
 
-Everything else in the vision above — Home/Lock Screen widgets (as opposed
-to the Live Activity above, which is a different WidgetKit surface),
-CloudKit sync/Handoff, and shared budgets — comes in later phases once its
+Everything else in the vision above — CloudKit sync/Handoff and shared budgets — comes in later phases once its
 prerequisites exist (see
 [Roadmap / deferred work](#roadmap--deferred-work-needs-a-paid-apple-developer-program)
 below).
@@ -168,8 +191,8 @@ below).
 - `MoneyIQCore/` — Swift package used by the app: SwiftData models, auth
   logic, persistence. Has its own test target (run on the Mac host for speed).
 - `iOS/MoneyIQ/` — thin app entry point.
-- `iOS/MoneyIQWidgets/` — the widget extension target hosting the budget
-  Live Activity (ActivityKit is iOS-only).
+- `iOS/MoneyIQWidgets/` — the widget extension target hosting Home/Lock
+  Screen spending and action widgets, plus the budget Live Activity (ActivityKit is iOS-only).
 - `Shared/` — SwiftUI views (splash, sign-in,
   onboarding, home, settings, app lock) plus `DesignSystem/` for the shared
   Liquid Glass backdrop and logo, and `Assets.xcassets` for the app icon and
@@ -259,9 +282,6 @@ Per the PRD's dependency table, these stay off until you enroll
   wouldn't find the same transactions/state there. Deferred until CloudKit
   sync exists to make it actually useful, not because of a hard entitlement
   requirement.
-- Home/Lock Screen widgets (Phase 2) — unlike the Live Activity above, a
-  static home screen widget is a genuinely separate process that needs to
-  read the same data as the app, which needs the App Groups entitlement
 - Shared/family budgets (Phase 5) — needs CloudKit shared zones plus a
   permissions model
 - Push-based financial notifications (need an APNs key/certificate) — the
