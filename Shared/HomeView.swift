@@ -134,7 +134,7 @@ struct HomeView: View {
                         }
                         .padding(.horizontal, 15)
                         .frame(height: 48)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        .glassEffect(.regular, in: .rect(cornerRadius: 16))
                         .padding(.bottom, 18)
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
@@ -156,14 +156,7 @@ struct HomeView: View {
                 .padding(.bottom, 32)
                 .frame(maxWidth: .infinity)
             }
-            .background(
-                LinearGradient(
-                    colors: [Color(red: 1, green: 0.973, blue: 0.946), Color(red: 0.985, green: 0.978, blue: 0.967)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-            )
+            .background(AppTheme.pageGradient.ignoresSafeArea())
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .alert(
@@ -183,7 +176,7 @@ struct HomeView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Text("M")
                         .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(AppTheme.emberRed)
+                        .foregroundStyle(AppTheme.accentText)
                         .accessibilityLabel("MoneyIQ Home")
                 }
                 ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
@@ -298,11 +291,11 @@ struct HomeView: View {
             Text(Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day()).uppercased())
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .tracking(1.4)
-                .foregroundStyle(AppTheme.emberRed)
+                .foregroundStyle(AppTheme.accentText)
             Text("\(greeting), \(account?.firstName ?? "there")")
                 .font(.system(size: 29, weight: .bold, design: .rounded))
                 .tracking(-0.7)
-                .foregroundStyle(Color(red: 0.18, green: 0.15, blue: 0.15))
+                .foregroundStyle(AppTheme.ink)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
         }
@@ -321,7 +314,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 11) {
             Text("Quick actions")
                 .font(.system(size: 19, weight: .bold, design: .rounded))
-                .foregroundStyle(Color(red: 0.18, green: 0.15, blue: 0.15))
+                .foregroundStyle(AppTheme.ink)
 
             Button { showingAddTransaction = true } label: {
                 HStack(spacing: 13) {
@@ -381,13 +374,13 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Image(systemName: symbol)
                     .font(.system(size: 19, weight: .medium))
-                    .foregroundStyle(AppTheme.emberRed)
+                    .foregroundStyle(AppTheme.accentText)
                     .frame(width: 34, height: 34)
                     .background(AppTheme.emberRed.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
                 Spacer(minLength: 8)
                 Text(title)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(red: 0.2, green: 0.16, blue: 0.16))
+                    .foregroundStyle(AppTheme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                 Text(subtitle)
@@ -398,7 +391,7 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
             .padding(14)
-            .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 19, style: .continuous))
+            .glassEffect(.regular, in: .rect(cornerRadius: 19))
         }
         .buttonStyle(HomeActionPressStyle())
         .accessibilityIdentifier(identifier)
@@ -409,17 +402,17 @@ struct HomeView: View {
         return VStack(alignment: .leading, spacing: 11) {
             Text("At a glance")
                 .font(.system(size: 19, weight: .bold, design: .rounded))
-                .foregroundStyle(Color(red: 0.18, green: 0.15, blue: 0.15))
+                .foregroundStyle(AppTheme.ink)
 
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("SPENT TODAY")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .tracking(1)
-                        .foregroundStyle(AppTheme.emberRed)
+                        .foregroundStyle(AppTheme.accentText)
                     Text(snapshot.todaySpent, format: .currency(code: snapshot.currencyCode).precision(.fractionLength(0)))
                         .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.19, green: 0.16, blue: 0.16))
+                        .foregroundStyle(AppTheme.ink)
                         .contentTransition(.numericText())
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
@@ -430,17 +423,17 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Rectangle()
-                    .fill(Color.black.opacity(0.07))
+                    .fill(AppTheme.separator)
                     .frame(width: 1, height: 58)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("TOP CATEGORY")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .tracking(1)
-                        .foregroundStyle(AppTheme.emberRed)
+                        .foregroundStyle(AppTheme.accentText)
                     Text(snapshot.topCategoryName ?? "No category yet")
                         .font(.system(size: 19, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.19, green: 0.16, blue: 0.16))
+                        .foregroundStyle(AppTheme.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     Text(snapshot.topCategoryName == nil
@@ -453,7 +446,7 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(18)
-            .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+            .glassEffect(.regular, in: .rect(cornerRadius: 21))
         }
     }
 
@@ -463,7 +456,7 @@ struct HomeView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Recent activity")
                     .font(.system(size: 21, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(red: 0.18, green: 0.15, blue: 0.15))
+                    .foregroundStyle(AppTheme.ink)
                 Spacer()
                 Text(monthSectionTitle)
                     .font(.caption.weight(.medium))
@@ -474,7 +467,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 9) {
                     Image(systemName: "receipt")
                         .font(.system(size: 23, weight: .light))
-                        .foregroundStyle(AppTheme.emberRed)
+                        .foregroundStyle(AppTheme.accentText)
                         .frame(width: 42, height: 42)
                         .background(AppTheme.emberRed.opacity(0.1), in: RoundedRectangle(cornerRadius: 13))
                     Text("Your month starts here")
@@ -484,12 +477,12 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                     Button("Log your first expense") { showingAddTransaction = true }
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppTheme.emberRed)
+                        .foregroundStyle(AppTheme.accentText)
                         .padding(.top, 3)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
-                .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 21))
+                .glassEffect(.regular, in: .rect(cornerRadius: 21))
             } else if rows.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("No matching expenses")
@@ -503,17 +496,17 @@ struct HomeView: View {
                         billsOnly = false
                     }
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.emberRed)
+                    .foregroundStyle(AppTheme.accentText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
-                .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 21))
+                .glassEffect(.regular, in: .rect(cornerRadius: 21))
             } else {
                 LazyVStack(spacing: 0) {
                     ForEach(rows) { transaction in
                         if transaction.id != rows.first?.id {
                             Rectangle()
-                                .fill(Color.black.opacity(0.06))
+                                .fill(AppTheme.separator)
                                 .frame(height: 1)
                                 .padding(.leading, 70)
                         }
@@ -526,7 +519,7 @@ struct HomeView: View {
                     }
                 }
                 .padding(.horizontal, 15)
-                .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+                .glassEffect(.regular, in: .rect(cornerRadius: 21))
             }
         }
     }
@@ -654,7 +647,7 @@ private struct TransactionRow: View {
                     HStack(spacing: 6) {
                         Text(transaction.merchantName ?? transaction.category?.name ?? "Uncategorized")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color(red: 0.2, green: 0.16, blue: 0.16))
+                            .foregroundStyle(AppTheme.ink)
                             .lineLimit(1)
                         if transaction.isAutoImported {
                             Image(systemName: "text.viewfinder")
@@ -683,14 +676,14 @@ private struct TransactionRow: View {
                     Text(amountText)
                         .font(.subheadline.weight(.bold))
                         .monospacedDigit()
-                        .foregroundStyle(Color(red: 0.2, green: 0.16, blue: 0.16))
+                        .foregroundStyle(AppTheme.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     if transaction.isBillLike {
                         Text("BILL")
                             .font(.system(size: 9, weight: .bold, design: .rounded))
                             .tracking(0.8)
-                            .foregroundStyle(AppTheme.emberRed)
+                            .foregroundStyle(AppTheme.accentText)
                     }
                 }
             }

@@ -163,7 +163,7 @@ struct LedgerContactDetailView: View {
                 Text("BALANCE WITH")
                     .font(.system(size: 10, weight: .bold, design: .rounded))
                     .tracking(1.2)
-                    .foregroundStyle(AppTheme.emberRed)
+                    .foregroundStyle(AppTheme.accentText)
                 Text(contact.name)
                     .font(.system(size: 27, weight: .bold, design: .rounded))
                     .foregroundStyle(SplitDesign.ink)
@@ -189,7 +189,7 @@ struct LedgerContactDetailView: View {
         }
         .padding(.horizontal, 15)
         .frame(height: 48)
-        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+        .glassEffect(.regular, in: .rect(cornerRadius: 16))
     }
 
     private var balanceHero: some View {
@@ -237,7 +237,7 @@ struct LedgerContactDetailView: View {
                 } label: {
                     Label("Settle up", systemImage: "checkmark.circle")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppTheme.emberRed)
+                        .foregroundStyle(AppTheme.accentText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
                         .background(SplitDesign.card, in: RoundedRectangle(cornerRadius: 17))
@@ -267,7 +267,7 @@ struct LedgerContactDetailView: View {
                 VStack(alignment: .leading, spacing: 9) {
                     Image(systemName: "text.book.closed")
                         .font(.system(size: 23, weight: .medium))
-                        .foregroundStyle(AppTheme.emberRed)
+                        .foregroundStyle(AppTheme.accentText)
                         .frame(width: 46, height: 46)
                         .background(AppTheme.emberRed.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
                     Text("Nothing recorded yet")
@@ -278,7 +278,7 @@ struct LedgerContactDetailView: View {
                         .foregroundStyle(SplitDesign.muted)
                     Button("Add the first entry") { showingAddEntry = true }
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppTheme.emberRed)
+                        .foregroundStyle(AppTheme.accentText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
@@ -295,7 +295,7 @@ struct LedgerContactDetailView: View {
                         directionFilter = .all
                     }
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.emberRed)
+                    .foregroundStyle(AppTheme.accentText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
@@ -305,7 +305,7 @@ struct LedgerContactDetailView: View {
                     ForEach(rows) { entry in
                         if entry.id != rows.first?.id {
                             Rectangle()
-                                .fill(Color.black.opacity(0.06))
+                                .fill(AppTheme.separator)
                                 .frame(height: 1)
                                 .padding(.leading, 66)
                         }
@@ -414,7 +414,7 @@ private struct EntryRow: View {
                     Text("SETTLEMENT")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
                         .tracking(0.7)
-                        .foregroundStyle(AppTheme.emberRed)
+                        .foregroundStyle(AppTheme.accentText)
                 }
             }
         }
@@ -514,7 +514,7 @@ private struct LedgerEntryEditorView: View {
             HStack(alignment: .firstTextBaseline, spacing: 9) {
                 Text(currencyCode)
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(AppTheme.emberRed)
+                    .foregroundStyle(AppTheme.accentText)
                 TextField("0.00", text: $amountText)
                     .font(.system(size: 31, weight: .bold, design: .rounded))
                     .keyboardType(.decimalPad)
@@ -570,10 +570,10 @@ private struct LedgerEntryEditorView: View {
                     .font(.subheadline)
                     .textInputAutocapitalization(.sentences)
             }
-            Rectangle().fill(Color.black.opacity(0.07)).frame(height: 1)
+            Rectangle().fill(AppTheme.separator).frame(height: 1)
             DatePicker("WHEN", selection: $date, displayedComponents: [.date, .hourAndMinute])
                 .font(.subheadline.weight(.medium))
-            Rectangle().fill(Color.black.opacity(0.07)).frame(height: 1)
+            Rectangle().fill(AppTheme.separator).frame(height: 1)
             Toggle("Mark as a settlement", isOn: $isSettlement)
                 .font(.subheadline.weight(.medium))
                 .tint(AppTheme.emberRed)

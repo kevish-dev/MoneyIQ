@@ -116,7 +116,7 @@ struct LedgerView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Text("M")
                         .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(AppTheme.emberRed)
+                        .foregroundStyle(AppTheme.accentText)
                         .accessibilityLabel("MoneyIQ Split")
                 }
                 ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
@@ -173,7 +173,7 @@ struct LedgerView: View {
             Text("SHARED MONEY")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .tracking(1.4)
-                .foregroundStyle(AppTheme.emberRed)
+                .foregroundStyle(AppTheme.accentText)
             Text("Split")
                 .font(.system(size: 34, weight: .bold, design: .rounded))
                 .tracking(-0.9)
@@ -202,7 +202,7 @@ struct LedgerView: View {
         }
         .padding(.horizontal, 15)
         .frame(height: 48)
-        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+        .glassEffect(.regular, in: .rect(cornerRadius: 16))
     }
 
     private var summaryHeader: some View {
@@ -322,7 +322,7 @@ struct LedgerView: View {
                         balanceFilter = .all
                     }
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.emberRed)
+                    .foregroundStyle(AppTheme.accentText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
@@ -332,7 +332,7 @@ struct LedgerView: View {
                     ForEach(rows) { contact in
                         if contact.id != rows.first?.id {
                             Rectangle()
-                                .fill(Color.black.opacity(0.06))
+                                .fill(AppTheme.separator)
                                 .frame(height: 1)
                                 .padding(.leading, 74)
                         }
@@ -381,7 +381,7 @@ struct LedgerView: View {
         VStack(alignment: .leading, spacing: 9) {
             Image(systemName: "person.2.crop.square.stack")
                 .font(.system(size: 23, weight: .medium))
-                .foregroundStyle(AppTheme.emberRed)
+                .foregroundStyle(AppTheme.accentText)
                 .frame(width: 46, height: 46)
                 .background(AppTheme.emberRed.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
             Text("No shared balances yet")

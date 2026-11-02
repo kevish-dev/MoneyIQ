@@ -86,7 +86,7 @@ struct SplitBillView: View {
             HStack(alignment: .firstTextBaseline, spacing: 9) {
                 Text(currencyCode)
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(AppTheme.emberRed)
+                    .foregroundStyle(AppTheme.accentText)
                 TextField("0.00", text: $totalText)
                     .font(.system(size: 31, weight: .bold, design: .rounded))
                     .keyboardType(.decimalPad)
@@ -107,7 +107,7 @@ struct SplitBillView: View {
                     .font(.subheadline)
                     .textInputAutocapitalization(.sentences)
             }
-            Rectangle().fill(Color.black.opacity(0.07)).frame(height: 1)
+            Rectangle().fill(AppTheme.separator).frame(height: 1)
             DatePicker("WHEN", selection: $date, displayedComponents: [.date, .hourAndMinute])
                 .font(.subheadline.weight(.medium))
         }
@@ -144,7 +144,7 @@ struct SplitBillView: View {
                 LazyVStack(spacing: 0) {
                     ForEach(contacts) { contact in
                         if contact.id != contacts.first?.id {
-                            Rectangle().fill(Color.black.opacity(0.06)).frame(height: 1).padding(.leading, 66)
+                            Rectangle().fill(AppTheme.separator).frame(height: 1).padding(.leading, 66)
                         }
                         Button { toggle(contact) } label: {
                             HStack(spacing: 11) {
@@ -186,7 +186,7 @@ struct SplitBillView: View {
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(SplitDesign.ink)
                 }
-                Rectangle().fill(Color.black.opacity(0.07)).frame(height: 1)
+                Rectangle().fill(AppTheme.separator).frame(height: 1)
                 ForEach(Array(people.indices), id: \.self) { index in
                     HStack {
                         Text(people[index].name)
