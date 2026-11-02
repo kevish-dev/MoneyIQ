@@ -57,6 +57,8 @@ struct ProjectsView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
                 .padding(.bottom, 32)
+                .frame(maxWidth: 700)
+                .frame(maxWidth: .infinity)
             }
             .safeAreaInset(edge: .bottom) {
                 Button { showingAddProject = true } label: {
@@ -67,6 +69,8 @@ struct ProjectsView: View {
                 .buttonStyle(.glassProminent)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
+                .frame(maxWidth: 700)
+                .frame(maxWidth: .infinity)
             }
             .navigationTitle("Projects")
             .navigationBarTitleDisplayMode(.inline)

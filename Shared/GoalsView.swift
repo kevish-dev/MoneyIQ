@@ -43,6 +43,8 @@ struct GoalsView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
                 .padding(.bottom, 32)
+                .frame(maxWidth: 700)
+                .frame(maxWidth: .infinity)
             }
             .safeAreaInset(edge: .bottom) {
                 Button {
@@ -55,6 +57,8 @@ struct GoalsView: View {
                 .buttonStyle(.glassProminent)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
+                .frame(maxWidth: 700)
+                .frame(maxWidth: .infinity)
             }
             .navigationTitle("Goals")
             .navigationBarTitleDisplayMode(.inline)
@@ -319,6 +323,8 @@ private struct GoalDetailView: View {
             .padding(.horizontal, 20)
             .padding(.top, 12)
             .padding(.bottom, 30)
+            .frame(maxWidth: 700)
+            .frame(maxWidth: .infinity)
         }
         .safeAreaInset(edge: .bottom) {
             Button { showingContribute = true } label: {
@@ -329,6 +335,8 @@ private struct GoalDetailView: View {
             .buttonStyle(.glassProminent)
             .padding(.horizontal, 20)
             .padding(.bottom, 8)
+            .frame(maxWidth: 700)
+            .frame(maxWidth: .infinity)
         }
         .navigationTitle(goal.name)
         .navigationBarTitleDisplayMode(.inline)

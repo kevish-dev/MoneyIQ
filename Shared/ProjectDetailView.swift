@@ -171,6 +171,8 @@ struct ProjectDetailView: View {
             .padding(.horizontal, 20)
             .padding(.top, 12)
             .padding(.bottom, 30)
+            .frame(maxWidth: 700)
+            .frame(maxWidth: .infinity)
         }
         .navigationTitle(project.name)
         .navigationBarTitleDisplayMode(.inline)

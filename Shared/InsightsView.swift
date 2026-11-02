@@ -151,6 +151,8 @@ struct InsightsView: View {
                 .padding(.horizontal, AppTheme.Spacing.large)
                 .padding(.top, AppTheme.Spacing.small)
                 .padding(.bottom, AppTheme.Spacing.large)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
             }
             .navigationTitle("Insights")
             .navigationBarTitleDisplayMode(.inline)
