@@ -22,64 +22,149 @@ struct ProjectsView: View {
         authManager.currentAccount?.preferredCurrencyCode ?? "USD"
     }
 
+    private var activeProjects: [FreelanceProject] {
+        projects.filter { FreelanceProjectEngine.progressFraction(totalAmount: $0.totalAmount, installments: $0.installments) < 1 }
+    }
+
+    private var outstandingInPreferredCurrency: Decimal {
+        activeProjects.filter { $0.currencyCode == currencyCode }.reduce(0) {
+            $0 + max(0, $1.totalAmount - FreelanceProjectEngine.totalReceived($1.installments))
+        }
+    }
+
     var body: some View {
         NavigationStack {
-            List {
-                if projects.isEmpty {
-                    emptyState
-                } else {
-                    ForEach(projects) { project in
-                        NavigationLink {
-                            ProjectDetailView(project: project)
-                        } label: {
-                            ProjectRow(project: project)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    projectsHeader
+                    if projects.isEmpty {
+                        emptyState
+                    } else {
+                        if let nextDue = projects.flatMap(\.installments).filter({ !$0.isReceived && $0.dueDate != nil }).min(by: { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }) {
+                            nextPaymentCard(nextDue)
                         }
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                projectsPendingDelete = [project]
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+                        if !activeProjects.isEmpty {
+                            sectionTitle("ACTIVE PROJECTS", count: activeProjects.count)
+                            ForEach(activeProjects) { project in projectLink(project) }
                         }
-                    }
-                    .onDelete { offsets in
-                        projectsPendingDelete = offsets.map { projects[$0] }
+                        let completed = projects.filter { project in !activeProjects.contains { $0.id == project.id } }
+                        if !completed.isEmpty {
+                            sectionTitle("PAID IN FULL", count: completed.count)
+                            ForEach(completed) { project in projectLink(project) }
+                        }
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 32)
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button { showingAddProject = true } label: {
+                    Label("New project", systemImage: "plus")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.glassProminent)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
             }
             .navigationTitle("Projects")
-            .compactListLayout()
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
                     ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
                 }
-                ToolbarItem {
-                    Button {
-                        showingAddProject = true
-                    } label: {
-                        Label("New Project", systemImage: "plus")
-                    }
-                }
             }
-            .sheet(isPresented: $showingAddProject) {
-                AddProjectView(currencyCode: currencyCode)
-            }
+            .sheet(isPresented: $showingAddProject) { AddProjectView(currencyCode: currencyCode) }
             .alert(
-                "Delete \(projectsPendingDelete?.count == 1 ? (projectsPendingDelete?.first?.name ?? "Project") : "\(projectsPendingDelete?.count ?? 0) Projects")?",
+                "Delete \(projectsPendingDelete?.first?.name ?? "Project")?",
                 isPresented: Binding(
                     get: { projectsPendingDelete != nil },
                     set: { if !$0 { projectsPendingDelete = nil } }
                 )
             ) {
                 Button("Delete", role: .destructive) {
-                    for project in projectsPendingDelete ?? [] {
-                        modelContext.delete(project)
-                    }
+                    for project in projectsPendingDelete ?? [] { modelContext.delete(project) }
                     try? modelContext.save()
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This also deletes all its installments and reimbursements. This can't be undone.")
+            }
+        }
+    }
+
+    private var projectsHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("YOUR FREELANCE DESK")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .tracking(2)
+                .foregroundStyle(.white.opacity(0.78))
+            Text("Work done.\nMoney tracked.")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(outstandingInPreferredCurrency, format: .currency(code: currencyCode))
+                    .font(.title3.bold())
+                Text("yet to receive")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .foregroundStyle(.white)
+            Text("Across \(activeProjects.filter { $0.currencyCode == currencyCode }.count) active \(currencyCode) projects")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(24)
+        .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: 26))
+    }
+
+    private func nextPaymentCard(_ installment: PaymentInstallment) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("NEXT PAYMENT")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .tracking(1.5)
+                .foregroundStyle(AppTheme.accent)
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(installment.label).font(.headline)
+                    Text(installment.project?.name ?? "Project").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(installment.amount, format: .currency(code: installment.project?.currencyCode ?? currencyCode))
+                    .font(.subheadline.bold())
+            }
+            if let due = installment.dueDate {
+                Label(due < .now ? "Overdue since \(due.formatted(date: .abbreviated, time: .omitted))" : "Due \(due.formatted(date: .abbreviated, time: .omitted))", systemImage: "calendar")
+                    .font(.caption)
+                    .foregroundStyle(due < .now ? .red : .secondary)
+            }
+        }
+        .padding(18)
+        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+    }
+
+    private func sectionTitle(_ title: String, count: Int) -> some View {
+        HStack {
+            Text(title).tracking(1.6)
+            Spacer()
+            Text("\(count)")
+        }
+        .font(.system(size: 11, weight: .bold, design: .rounded))
+        .foregroundStyle(.secondary)
+    }
+
+    private func projectLink(_ project: FreelanceProject) -> some View {
+        NavigationLink {
+            ProjectDetailView(project: project)
+        } label: {
+            ProjectRow(project: project)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(role: .destructive) { projectsPendingDelete = [project] } label: {
+                Label("Delete", systemImage: "trash")
             }
         }
     }
@@ -97,8 +182,8 @@ struct ProjectsView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .listRowBackground(Color.clear)
+        .padding(24)
+        .glassEffect(.regular, in: .rect(cornerRadius: 22))
     }
 }
 
@@ -142,7 +227,8 @@ private struct ProjectRow: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .padding(.vertical, AppTheme.Spacing.xs)
+        .padding(16)
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
     }
 }
 
