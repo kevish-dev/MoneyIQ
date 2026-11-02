@@ -93,6 +93,11 @@ struct InsightsView: View {
             facts.append("Change from previous month: \(change.formatted(.percent.precision(.fractionLength(1))))")
         }
         facts += categoryShares.prefix(6).map { "Category \($0.categoryName): \($0.total.formatted(.currency(code: currencyCode))), \($0.fraction.formatted(.percent.precision(.fractionLength(0)))) of spend" }
+        if let previousMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) {
+            facts += InsightsEngine.categoryShares(transactions: transactions, forMonthContaining: previousMonth)
+                .prefix(3)
+                .map { "Previous month category \($0.categoryName): \($0.total.formatted(.currency(code: currencyCode)))" }
+        }
         facts += topMerchants.prefix(4).map { "Merchant \($0.merchantName): \($0.total.formatted(.currency(code: currencyCode))) in \($0.occurrences) transactions" }
         facts += anomalies.prefix(3).map { "Unusual transaction \($0.transaction.merchantName ?? "Unknown merchant"): \($0.transaction.amount.formatted(.currency(code: currencyCode)))" }
         if isCurrentMonth {
@@ -105,6 +110,13 @@ struct InsightsView: View {
                 let progress = BudgetEngine.monthProgress(for: budget, transactions: transactions)
                 facts.append("Monthly budget: \(budget.monthlyCapAmount.formatted(.currency(code: currencyCode))); remaining: \(progress.remaining.formatted(.currency(code: currencyCode)))")
             }
+        }
+        facts += subscriptions.prefix(3).map {
+            "Recurring candidate \($0.merchantName): about \($0.averageAmount.formatted(.currency(code: currencyCode))) next expected \($0.expectedNextDate.formatted(date: .abbreviated, time: .omitted))"
+        }
+        let monthTransactions = transactions.filter { calendar.isDate($0.date, equalTo: selectedMonth, toGranularity: .month) }
+        facts += monthTransactions.sorted { $0.amount > $1.amount }.prefix(5).map {
+            "Purchase \($0.merchantName ?? $0.category?.name ?? "Uncategorized") on \($0.date.formatted(date: .abbreviated, time: .omitted)): \($0.amount.formatted(.currency(code: currencyCode)))"
         }
         return facts
     }
