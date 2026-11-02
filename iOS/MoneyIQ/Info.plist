@@ -41,6 +41,8 @@
 	<string>$(MIQ_SUPABASE_PUBLISHABLE_KEY)</string>
 	<key>MIQ_SUPABASE_URL</key>
 	<string>$(MIQ_SUPABASE_URL)</string>
+	<key>MIQ_WIDGET_KEYCHAIN_GROUP</key>
+	<string>$(AppIdentifierPrefix)com.moneyiq.widgetdata</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>MoneyIQ uses Face ID to keep your financial data private.</string>
 	<key>NSSupportsLiveActivities</key>

@@ -7,6 +7,7 @@ struct HomeView: View {
     let settings: AppSettingsStore
     let notifications: NotificationScheduler
     let lockManager: AppLockManager
+    @Binding var expenseActionRequest: WidgetRoute?
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \ExpenseTransaction.date, order: .reverse) private var transactions: [ExpenseTransaction]
@@ -16,12 +17,15 @@ struct HomeView: View {
 
     @State private var showingAddTransaction = false
     @State private var showingScreenshotImport = false
+    @State private var autoPresentScreenshotPicker = false
     @State private var clipboardImportText: String?
     @State private var isReadingClipboard = false
     @State private var clipboardProblem: ClipboardProblem?
     @State private var editingTransaction: ExpenseTransaction?
     @State private var deletingTransaction: ExpenseTransaction?
     @State private var searchText = ""
+    @State private var isSearchExpanded = false
+    @FocusState private var isSearchFocused: Bool
     @State private var sortOption: TransactionSortOption = .dateDescending
     @State private var categoryFilter: ExpenseCategory?
     @State private var billsOnly = false
@@ -85,6 +89,14 @@ struct HomeView: View {
         Date.now.formatted(.dateTime.month(.wide).year())
     }
 
+    private var homeSnapshot: WidgetSnapshot {
+        WidgetSnapshotBuilder.make(
+            currencyCode: account?.preferredCurrencyCode ?? "USD",
+            budget: budgets.first,
+            transactions: transactions
+        )
+    }
+
     /// Extracted so the category filter Menu's button labels aren't
     /// each an inline if/else — that was pushing the surrounding Menu
     /// expression past the type-checker's time budget.
@@ -99,48 +111,61 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                if let account = authManager.currentAccount {
-                    // Not wrapped in a `Section` on purpose — an empty-header
-                    // Section here was rendering a thin divider line above
-                    // the budget card in plain list style.
-                    BudgetCardView(
-                        currencyCode: account.preferredCurrencyCode,
-                        onAddExpenseManually: { showingAddTransaction = true },
-                        onAddExpenseFromScreenshot: { showingScreenshotImport = true },
-                        onAddExpenseFromClipboard: { pasteFromClipboard() }
-                    )
-                    .listRowInsets(EdgeInsets(
-                        top: AppTheme.Spacing.small,
-                        leading: AppTheme.Spacing.large,
-                        bottom: AppTheme.Spacing.small,
-                        trailing: AppTheme.Spacing.large
-                    ))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    homeHeader
+                        .padding(.bottom, 21)
 
-                Section(monthSectionTitle) {
-                    if currentMonthTransactions.isEmpty {
-                        Text("No transactions this month yet.")
-                            .foregroundStyle(.secondary)
+                    if isSearchExpanded {
+                        HStack(spacing: 10) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundStyle(.secondary)
+                            TextField("Search transactions", text: $searchText)
+                                .focused($isSearchFocused)
+                                .submitLabel(.search)
+                                .textInputAutocapitalization(.never)
+                            if !searchText.isEmpty {
+                                Button { searchText = "" } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .accessibilityLabel("Clear search")
+                            }
+                        }
+                        .padding(.horizontal, 15)
+                        .frame(height: 48)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        .padding(.bottom, 18)
+                        .transition(.move(edge: .top).combined(with: .opacity))
                     }
-                    if !currentMonthTransactions.isEmpty && displayedTransactions.isEmpty {
-                        Text("No transactions match your search/filters.")
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(displayedTransactions) { transaction in
-                        TransactionRow(
-                            transaction: transaction,
-                            currencyCode: account?.preferredCurrencyCode ?? "USD",
-                            onEdit: { editingTransaction = transaction },
-                            onDelete: { deletingTransaction = transaction }
-                        )
-                    }
+
+                    BudgetCardView(currencyCode: account?.preferredCurrencyCode ?? "USD")
+                        .padding(.bottom, 27)
+
+                    quickActions
+                        .padding(.bottom, 27)
+
+                    atAGlance
+                        .padding(.bottom, 28)
+
+                    recentActivity
                 }
+                .frame(maxWidth: 720)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 32)
+                .frame(maxWidth: .infinity)
             }
-            .navigationTitle("MoneyIQ")
-            .compactListLayout()
+            .background(
+                LinearGradient(
+                    colors: [Color(red: 1, green: 0.973, blue: 0.946), Color(red: 0.985, green: 0.978, blue: 0.967)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            )
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .alert(
                 "Delete Transaction?",
                 isPresented: Binding(
@@ -154,14 +179,24 @@ struct HomeView: View {
             } message: { _ in
                 Text("This can't be undone.")
             }
-            .searchable(text: $searchText, prompt: "Search transactions")
-            // The toolbar "Add" menu was removed — there's now a single
-            // entry point for starting a new transaction: the "Add Expense"
-            // button on the budget card, which itself presents the same
-            // "Enter Manually" / "From Screenshot" choice as a menu.
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Text("M")
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(AppTheme.emberRed)
+                        .accessibilityLabel("MoneyIQ Home")
+                }
                 ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
-                    ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isSearchExpanded.toggle()
+                            if !isSearchExpanded { searchText = "" }
+                        }
+                        isSearchFocused = isSearchExpanded
+                    } label: {
+                        Image(systemName: isSearchExpanded ? "xmark" : "magnifyingglass")
+                    }
+                    .accessibilityLabel(isSearchExpanded ? "Close search" : "Search transactions")
                 }
                 ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
                     Menu {
@@ -196,6 +231,9 @@ struct HomeView: View {
                             : "line.3.horizontal.decrease.circle")
                     }
                 }
+                ToolbarItem(placement: AppTheme.trailingToolbarPlacement) {
+                    ProfileMenuButton(authManager: authManager, settings: settings, notifications: notifications, lockManager: lockManager)
+                }
             }
             .sheet(item: $editingTransaction) { transaction in
                 EditTransactionView(transaction: transaction, categories: categories)
@@ -203,8 +241,10 @@ struct HomeView: View {
             .sheet(isPresented: $showingAddTransaction) {
                 AddTransactionView(categories: categories)
             }
+            .onAppear { handleRequestedExpenseAction() }
+            .onChange(of: expenseActionRequest) { _, _ in handleRequestedExpenseAction() }
             .sheet(isPresented: $showingScreenshotImport) {
-                ScreenshotImportView(categories: categories)
+                ScreenshotImportView(categories: categories, autoPresentPicker: autoPresentScreenshotPicker)
             }
             .sheet(isPresented: Binding(
                 get: { clipboardImportText != nil },
@@ -237,32 +277,13 @@ struct HomeView: View {
             // with real budget data whenever it changes — opt-in via
             // Settings, since showing anything outside the app shouldn't be
             // the default just because a budget exists.
-            .task(id: liveActivitySyncKey) {
-                guard settings.isBudgetLiveActivityEnabled else {
+            .task(id: liveActivityState) {
+                guard settings.isBudgetLiveActivityEnabled, let state = liveActivityState else {
                     if liveActivityManager.isActive {
                         await liveActivityManager.end()
                     }
                     return
                 }
-                guard let budget = budgets.first, let account = authManager.currentAccount else { return }
-                let progress = BudgetEngine.monthProgress(for: budget, transactions: transactions)
-                let pace = BudgetEngine.dailyPace(remaining: progress.remaining)
-                let nearestGoal = goals.first { !$0.isComplete }
-
-                let state = BudgetActivityAttributes.ContentState(
-                    spent: progress.spent,
-                    cap: progress.effectiveCap,
-                    currencyCode: account.preferredCurrencyCode,
-                    showOnLockScreen: settings.isBudgetLockScreenEnabled,
-                    showOnDynamicIsland: settings.isBudgetDynamicIslandEnabled,
-                    lockScreenKind: settings.lockScreenContentKind,
-                    dynamicIslandKind: settings.dynamicIslandContentKind,
-                    goalName: nearestGoal?.name,
-                    goalSaved: nearestGoal?.savedAmount ?? 0,
-                    goalTarget: nearestGoal?.targetAmount ?? 0,
-                    recommendedDailySpend: pace.recommendedDailySpend,
-                    daysRemainingInMonth: pace.daysRemaining
-                )
                 if liveActivityManager.isActive {
                     await liveActivityManager.update(state: state)
                 } else {
@@ -272,11 +293,282 @@ struct HomeView: View {
         }
     }
 
-    private var liveActivitySyncKey: String {
-        "\(settings.isBudgetLockScreenEnabled)-\(settings.isBudgetDynamicIslandEnabled)-\(settings.lockScreenContentKind.rawValue)-\(settings.dynamicIslandContentKind.rawValue)-\(budgets.first?.id.uuidString ?? "none")-\(transactions.count)-\(goals.count)"
+    private var homeHeader: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day()).uppercased())
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .tracking(1.4)
+                .foregroundStyle(AppTheme.emberRed)
+            Text("\(greeting), \(account?.firstName ?? "there")")
+                .font(.system(size: 29, weight: .bold, design: .rounded))
+                .tracking(-0.7)
+                .foregroundStyle(Color(red: 0.18, green: 0.15, blue: 0.15))
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var greeting: String {
+        switch Calendar.current.component(.hour, from: .now) {
+        case 5..<12: "Good morning"
+        case 12..<17: "Good afternoon"
+        default: "Good evening"
+        }
+    }
+
+    private var quickActions: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text("Quick actions")
+                .font(.system(size: 19, weight: .bold, design: .rounded))
+                .foregroundStyle(Color(red: 0.18, green: 0.15, blue: 0.15))
+
+            Button { showingAddTransaction = true } label: {
+                HStack(spacing: 13) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .bold))
+                        .frame(width: 39, height: 39)
+                        .background(.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Log an expense")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                        Text("Enter details manually")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.75))
+                    }
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 13)
+                .background(AppTheme.emberRed, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
+            .buttonStyle(HomeActionPressStyle())
+            .accessibilityIdentifier("home.logExpense")
+
+            HStack(spacing: 11) {
+                secondaryAction(
+                    title: "Paste expense",
+                    subtitle: "From clipboard",
+                    symbol: "doc.on.clipboard.fill",
+                    identifier: "home.pasteExpense"
+                ) { pasteFromClipboard() }
+
+                secondaryAction(
+                    title: "Add screenshot",
+                    subtitle: "Read a payment",
+                    symbol: "photo.on.rectangle.angled",
+                    identifier: "home.screenshotExpense"
+                ) {
+                    autoPresentScreenshotPicker = true
+                    showingScreenshotImport = true
+                }
+            }
+        }
+    }
+
+    private func secondaryAction(
+        title: String,
+        subtitle: String,
+        symbol: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 0) {
+                Image(systemName: symbol)
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundStyle(AppTheme.emberRed)
+                    .frame(width: 34, height: 34)
+                    .background(AppTheme.emberRed.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
+                Spacer(minLength: 8)
+                Text(title)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(red: 0.2, green: 0.16, blue: 0.16))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .padding(.top, 2)
+            }
+            .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+            .padding(14)
+            .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 19, style: .continuous))
+        }
+        .buttonStyle(HomeActionPressStyle())
+        .accessibilityIdentifier(identifier)
+    }
+
+    private var atAGlance: some View {
+        let snapshot = homeSnapshot
+        return VStack(alignment: .leading, spacing: 11) {
+            Text("At a glance")
+                .font(.system(size: 19, weight: .bold, design: .rounded))
+                .foregroundStyle(Color(red: 0.18, green: 0.15, blue: 0.15))
+
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("SPENT TODAY")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .tracking(1)
+                        .foregroundStyle(AppTheme.emberRed)
+                    Text(snapshot.todaySpent, format: .currency(code: snapshot.currencyCode).precision(.fractionLength(0)))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(red: 0.19, green: 0.16, blue: 0.16))
+                        .contentTransition(.numericText())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                    Text("Your daily total")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Rectangle()
+                    .fill(Color.black.opacity(0.07))
+                    .frame(width: 1, height: 58)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("TOP CATEGORY")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .tracking(1)
+                        .foregroundStyle(AppTheme.emberRed)
+                    Text(snapshot.topCategoryName ?? "No category yet")
+                        .font(.system(size: 19, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(red: 0.19, green: 0.16, blue: 0.16))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(snapshot.topCategoryName == nil
+                         ? "This month"
+                         : snapshot.topCategoryAmount.formatted(.currency(code: snapshot.currencyCode).precision(.fractionLength(0))) + " this month")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(18)
+            .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+        }
+    }
+
+    private var recentActivity: some View {
+        let rows = displayedTransactions
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Recent activity")
+                    .font(.system(size: 21, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(red: 0.18, green: 0.15, blue: 0.15))
+                Spacer()
+                Text(monthSectionTitle)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            if currentMonthTransactions.isEmpty {
+                VStack(alignment: .leading, spacing: 9) {
+                    Image(systemName: "receipt")
+                        .font(.system(size: 23, weight: .light))
+                        .foregroundStyle(AppTheme.emberRed)
+                        .frame(width: 42, height: 42)
+                        .background(AppTheme.emberRed.opacity(0.1), in: RoundedRectangle(cornerRadius: 13))
+                    Text("Your month starts here")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Add an expense to see your activity and budget progress.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Log your first expense") { showingAddTransaction = true }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.emberRed)
+                        .padding(.top, 3)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
+                .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 21))
+            } else if rows.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("No matching expenses")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Try a different search or clear the filters.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Clear search and filters") {
+                        searchText = ""
+                        categoryFilter = nil
+                        billsOnly = false
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppTheme.emberRed)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
+                .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 21))
+            } else {
+                LazyVStack(spacing: 0) {
+                    ForEach(rows) { transaction in
+                        if transaction.id != rows.first?.id {
+                            Rectangle()
+                                .fill(Color.black.opacity(0.06))
+                                .frame(height: 1)
+                                .padding(.leading, 70)
+                        }
+                        TransactionRow(
+                            transaction: transaction,
+                            currencyCode: account?.preferredCurrencyCode ?? "USD",
+                            onEdit: { editingTransaction = transaction },
+                            onDelete: { deletingTransaction = transaction }
+                        )
+                    }
+                }
+                .padding(.horizontal, 15)
+                .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+            }
+        }
+    }
+
+    private var liveActivityState: BudgetActivityAttributes.ContentState? {
+        guard let budget = budgets.first, let account = authManager.currentAccount else { return nil }
+        let progress = BudgetEngine.monthProgress(for: budget, transactions: transactions)
+        let pace = BudgetEngine.dailyPace(remaining: progress.remaining)
+        let nearestGoal = goals.first { !$0.isComplete }
+        return BudgetActivityAttributes.ContentState(
+            spent: progress.spent,
+            cap: progress.effectiveCap,
+            currencyCode: account.preferredCurrencyCode,
+            showOnLockScreen: settings.isBudgetLockScreenEnabled,
+            showOnDynamicIsland: settings.isBudgetDynamicIslandEnabled,
+            lockScreenKind: settings.lockScreenContentKind,
+            dynamicIslandKind: settings.dynamicIslandContentKind,
+            goalName: nearestGoal?.name,
+            goalSaved: nearestGoal?.savedAmount ?? 0,
+            goalTarget: nearestGoal?.targetAmount ?? 0,
+            recommendedDailySpend: pace.recommendedDailySpend,
+            daysRemainingInMonth: pace.daysRemaining
+        )
     }
 
     private var account: UserAccount? { authManager.currentAccount }
+
+    private func handleRequestedExpenseAction() {
+        guard let action = expenseActionRequest else { return }
+        expenseActionRequest = nil
+        switch action {
+        case .addExpense:
+            showingAddTransaction = true
+        case .pasteExpense:
+            pasteFromClipboard()
+        case .screenshotExpense:
+            autoPresentScreenshotPicker = true
+            showingScreenshotImport = true
+        case .budget, .insights:
+            break
+        }
+    }
 
     private func deleteTransaction(_ transaction: ExpenseTransaction) {
         modelContext.delete(transaction)
@@ -336,10 +628,17 @@ private enum ClipboardProblem: Identifiable {
     }
 }
 
-/// Pulled out of `HomeView.body` as its own view — the whole List was one
-/// enormous expression that the type-checker choked on ("unable to
-/// type-check this expression in reasonable time"); a real view struct
-/// avoids feeding it as one inline closure.
+private struct HomeActionPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .opacity(configuration.isPressed ? 0.88 : 1)
+            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+    }
+}
+
+/// A tappable activity row. The long-press menu keeps delete close by
+/// without making it easy to trigger accidentally.
 private struct TransactionRow: View {
     let transaction: ExpenseTransaction
     let currencyCode: String
@@ -347,47 +646,59 @@ private struct TransactionRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            IconBubble(systemName: transaction.category?.systemIconName ?? "creditcard")
+        Button(action: onEdit) {
+            HStack(spacing: 12) {
+                IconBubble(systemName: transaction.category?.systemIconName ?? "creditcard", tint: AppTheme.emberRed, diameter: 42)
 
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(transaction.merchantName ?? transaction.category?.name ?? "Uncategorized")
-                        .font(.subheadline.weight(.medium))
-                    if transaction.isAutoImported {
-                        Image(systemName: "text.viewfinder")
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(transaction.merchantName ?? transaction.category?.name ?? "Uncategorized")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color(red: 0.2, green: 0.16, blue: 0.16))
+                            .lineLimit(1)
+                        if transaction.isAutoImported {
+                            Image(systemName: "text.viewfinder")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        if transaction.editedAt != nil {
+                            Image(systemName: "pencil.circle.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Text(relativeTimeText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    if let note = transaction.note, !note.isEmpty {
+                        Text(note)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                    }
-                    if transaction.editedAt != nil {
-                        Image(systemName: "pencil.circle.fill")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    if transaction.isBillLike {
-                        Text("Bill")
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(AppTheme.accent.opacity(0.18), in: Capsule())
-                            .foregroundStyle(AppTheme.accent)
+                            .lineLimit(1)
                     }
                 }
-                Text(relativeTimeText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if let note = transaction.note {
-                    Text(note).font(.caption).foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(amountText)
+                        .font(.subheadline.weight(.bold))
+                        .monospacedDigit()
+                        .foregroundStyle(Color(red: 0.2, green: 0.16, blue: 0.16))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    if transaction.isBillLike {
+                        Text("BILL")
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .tracking(0.8)
+                            .foregroundStyle(AppTheme.emberRed)
+                    }
                 }
             }
-            Spacer()
-            Text(amountText)
-                .font(.subheadline.weight(.semibold))
+            .padding(.vertical, 13)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, AppTheme.Spacing.small)
-        .contentShape(Rectangle())
-        // Hold-to-edit/delete instead of swipe — consistent with Split and
-        // Goals, and more discoverable than a hidden swipe gesture.
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens expense for editing")
         .contextMenu {
             Button(action: onEdit) {
                 Label("Edit", systemImage: "pencil")

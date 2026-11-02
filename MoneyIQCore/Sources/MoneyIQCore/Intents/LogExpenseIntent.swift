@@ -1,12 +1,15 @@
 import AppIntents
 import SwiftData
 import Foundation
+#if os(iOS)
+import WidgetKit
+#endif
 
 /// "Log ₹200 for lunch" from the PRD's Phase 6 example. This runs in the
 /// main app's own process (it's a plain `AppIntent` in the app target, not a
 /// separate App Intents Extension), so it opens the same on-disk SwiftData
-/// store the app itself uses — no App Groups needed, unlike widgets/Live
-/// Activities where the extension is a genuinely separate process.
+/// store the app itself uses — no App Groups needed. After saving, it also
+/// refreshes the aggregate snapshot used by Home and Lock Screen widgets.
 public struct LogExpenseIntent: AppIntent {
     public static let title: LocalizedStringResource = "Log Expense"
     public static let description = IntentDescription("Add a new expense to MoneyIQ.")
@@ -38,6 +41,20 @@ public struct LogExpenseIntent: AppIntent {
             )
             context.insert(transaction)
             try context.save()
+            #if os(iOS)
+            if let currentSnapshot = WidgetSnapshotStore.load(),
+               let transactions = try? context.fetch(FetchDescriptor<ExpenseTransaction>()),
+               let budgets = try? context.fetch(FetchDescriptor<Budget>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])) {
+                let snapshot = WidgetSnapshotBuilder.make(
+                    currencyCode: currentSnapshot.currencyCode,
+                    budget: budgets.first,
+                    transactions: transactions
+                )
+                if WidgetSnapshotStore.save(snapshot) {
+                    WidgetCenter.shared.reloadAllTimelines()
+                }
+            }
+            #endif
         }
 
         let dialog: IntentDialog = note.map { "Logged \(amount.formatted()) for \($0)." } ?? "Logged \(amount.formatted())."

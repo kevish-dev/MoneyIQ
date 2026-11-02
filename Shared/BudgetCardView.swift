@@ -2,18 +2,10 @@ import SwiftUI
 import SwiftData
 import MoneyIQCore
 
-/// The monthly budget card shown at the top of Home — this is also the only
-/// place a `Budget` gets created, since Phase 1 never actually shipped a UI
-/// for it despite having the data model.
+/// Monthly spending hero. Tapping it opens the budget editor, whether or not
+/// a cap has been set yet. Expense actions live separately in HomeView.
 struct BudgetCardView: View {
     let currencyCode: String
-    /// Both are optional so previews/tests that don't need the sheet
-    /// wiring can omit them, but Home passes both — this button is the
-    /// single entry point for starting a new transaction (the old toolbar
-    /// menu on Home was removed in favor of this one).
-    var onAddExpenseManually: (() -> Void)?
-    var onAddExpenseFromScreenshot: (() -> Void)?
-    var onAddExpenseFromClipboard: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Budget.createdAt, order: .reverse) private var budgets: [Budget]
@@ -24,131 +16,111 @@ struct BudgetCardView: View {
     private var activeBudget: Budget? { budgets.first }
 
     var body: some View {
-        Group {
-            if let budget = activeBudget {
-                let progress = BudgetEngine.monthProgress(for: budget, transactions: transactions)
-                VStack(spacing: 14) {
-                    Button {
-                        showingEditor = true
-                    } label: {
-                        heroContent(budget: budget, progress: progress)
-                    }
-                    .buttonStyle(.plain)
-
-                    quickActions
+        Button { showingEditor = true } label: {
+            heroContent
+                .padding(22)
+                .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .overlay(alignment: .topTrailing) {
+                    Circle()
+                        .stroke(.white.opacity(0.1), lineWidth: 24)
+                        .frame(width: 178, height: 178)
+                        .offset(x: 72, y: -88)
+                        .allowsHitTesting(false)
                 }
-            } else {
-                Button {
-                    showingEditor = true
-                } label: {
-                    Label("Set a monthly budget", systemImage: "plus.circle")
-                        .frame(maxWidth: .infinity)
-                        .padding(AppTheme.Spacing.large)
-                        .foregroundStyle(.white)
-                        .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
-                }
-                .buttonStyle(.plain)
-            }
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .shadow(color: AppTheme.emberRed.opacity(0.22), radius: 20, y: 11)
         }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens monthly budget settings")
         .sheet(isPresented: $showingEditor) {
             BudgetEditView(budget: activeBudget, currencyCode: currencyCode)
         }
     }
 
-    private func heroContent(budget: Budget, progress: BudgetEngine.MonthProgress) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("This Month's Budget")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.85))
-                Spacer()
-                if budget.rolloverEnabled && progress.rolloverFromLastMonth > 0 {
-                    Label("+\(progress.rolloverFromLastMonth.formatted(.currency(code: currencyCode))) rolled over", systemImage: "arrow.triangle.2.circlepath")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.white)
-                }
-            }
+    private var heroContent: some View {
+        let progress = activeBudget.map { BudgetEngine.monthProgress(for: $0, transactions: transactions) }
+        let spent = progress?.spent ?? BudgetEngine.totalSpent(transactions: transactions, inMonthContaining: .now)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Remaining")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.7))
-                Text(progress.remaining, format: .currency(code: currencyCode))
-                    .font(.system(size: 38, weight: .bold, design: .rounded))
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(Date.now.formatted(.dateTime.month(.wide)).uppercased() + "  /  SPENDING")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .tracking(1.4)
+                    .foregroundStyle(.white.opacity(0.78))
+                Spacer()
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(.white.opacity(0.16), in: Circle())
+                    .accessibilityHidden(true)
             }
 
-            HStack(spacing: 6) {
-                Image(systemName: progress.fractionUsed >= 1 ? "arrow.up.right" : "chart.pie.fill")
-                    .font(.caption2.weight(.bold))
-                Text("\(Int((progress.fractionUsed * 100).rounded()))% of \(progress.effectiveCap.formatted(.currency(code: currencyCode))) used")
-                    .font(.caption.weight(.medium))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, AppTheme.Spacing.medium)
-            .padding(.vertical, AppTheme.Spacing.small)
-            .background(AppTheme.pillBackgroundOnHero, in: Capsule())
+            Text(spent, format: .currency(code: currencyCode).precision(.fractionLength(0)))
+                .font(.system(size: 40, weight: .bold, design: .rounded))
+                .tracking(-1.5)
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
+                .minimumScaleFactor(0.55)
+                .lineLimit(1)
+                .padding(.top, 13)
+            Text("Spent this month")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white.opacity(0.76))
+                .padding(.top, 1)
 
-            ProgressView(value: min(progress.fractionUsed, 1))
-                .tint(.white)
-                .background(Color.white.opacity(0.2), in: Capsule())
+            if let progress {
+                let isOver = progress.remaining < 0
+                ProgressView(value: min(progress.fractionUsed, 1))
+                    .tint(.white)
+                    .background(.white.opacity(0.24), in: Capsule())
+                    .padding(.top, 20)
 
-            HStack {
-                Text("\(progress.spent.formatted(.currency(code: currencyCode))) spent")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.75))
-                Spacer()
-                Text("of \(progress.effectiveCap.formatted(.currency(code: currencyCode))) cap")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.75))
+                HStack(alignment: .bottom, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(isOver ? "OVER BUDGET BY" : "LEFT TO SPEND")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .tracking(1)
+                            .foregroundStyle(.white.opacity(0.7))
+                        Text(abs(progress.remaining), format: .currency(code: currencyCode).precision(.fractionLength(0)))
+                            .font(.system(size: 21, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                    }
+                    Spacer(minLength: 4)
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text("MONTHLY CAP")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .tracking(1)
+                            .foregroundStyle(.white.opacity(0.7))
+                        Text(progress.effectiveCap, format: .currency(code: currencyCode).precision(.fractionLength(0)))
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                    }
+                }
+                .padding(.top, 13)
+                if let budget = activeBudget, budget.rolloverEnabled && progress.rolloverFromLastMonth > 0 {
+                    Label("\(progress.rolloverFromLastMonth.formatted(.currency(code: currencyCode))) carried over", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.82))
+                        .padding(.top, 11)
+                }
+            } else {
+                HStack(spacing: 7) {
+                    Image(systemName: "plus.circle.fill")
+                    Text("Set a monthly budget")
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.top, 23)
             }
         }
-        .padding(AppTheme.Spacing.large)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.heroGradient, in: RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
-        .shadow(color: AppTheme.emberRed.opacity(0.3), radius: 16, y: 10)
-    }
-
-    private var quickActions: some View {
-        HStack(spacing: AppTheme.Spacing.medium) {
-            Button {
-                showingEditor = true
-            } label: {
-                Label("Edit Budget", systemImage: "slider.horizontal.3")
-                    .labelStyle(.titleAndIcon)
-                    .font(.subheadline.weight(.medium))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, AppTheme.Spacing.medium)
-            }
-            .buttonStyle(.bordered)
-            .tint(AppTheme.accent)
-
-            Menu {
-                Button {
-                    onAddExpenseManually?()
-                } label: {
-                    Label("Enter Manually", systemImage: "square.and.pencil")
-                }
-                Button {
-                    onAddExpenseFromScreenshot?()
-                } label: {
-                    Label("From Screenshot", systemImage: "text.viewfinder")
-                }
-                Button {
-                    onAddExpenseFromClipboard?()
-                } label: {
-                    Label("Paste from Clipboard", systemImage: "doc.on.clipboard")
-                }
-            } label: {
-                Label("Add Expense", systemImage: "plus")
-                    .labelStyle(.titleAndIcon)
-                    .font(.subheadline.weight(.medium))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, AppTheme.Spacing.medium)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(AppTheme.accent)
-        }
     }
 }
 

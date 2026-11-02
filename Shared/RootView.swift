@@ -23,6 +23,9 @@ struct RootView: View {
     @State private var presentedImportID: UUID?
     @State private var handledImportIDs: Set<UUID> = []
     @State private var suspendedImportForLock = false
+    @State private var selectedTab: MoneyIQTab = .home
+    @State private var expenseActionRequest: WidgetRoute?
+    @State private var pendingWidgetRoute: WidgetRoute?
 
     var body: some View {
         Group {
@@ -37,7 +40,9 @@ struct RootView: View {
                             authManager: authManager!,
                             settings: settingsStore,
                             notifications: notificationScheduler,
-                            lockManager: lockManager!
+                            lockManager: lockManager!,
+                            selectedTab: $selectedTab,
+                            expenseActionRequest: $expenseActionRequest
                         )
                     }
                 } else {
@@ -45,6 +50,11 @@ struct RootView: View {
                 }
             } else {
                 SignInView(authManager: authManager!)
+            }
+        }
+        .background {
+            if let authManager {
+                WidgetSnapshotBridge(account: authManager.currentAccount)
             }
         }
         .task {
@@ -63,10 +73,12 @@ struct RootView: View {
             if newPhase == .active {
                 lockManager?.lockIfEnabled()
                 collectPendingImports()
+                openPendingWidgetRoute()
             }
         }
         .onChange(of: canPresentImports) { _, canPresent in
             if canPresent {
+                openPendingWidgetRoute()
                 presentNextImport()
             } else if let active = activeImport {
                 // Locked mid-review: the sheet sits above the lock screen, so
@@ -77,6 +89,11 @@ struct RootView: View {
             }
         }
         .onOpenURL { url in
+            if let route = WidgetRoute(url: url) {
+                pendingWidgetRoute = route
+                openPendingWidgetRoute()
+                return
+            }
             guard url.scheme == "moneyiq", url.host == "import-share" else { return }
             let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
             let id = queryItems.first { $0.name == "id" }?.value.flatMap(UUID.init(uuidString:))
@@ -100,6 +117,27 @@ struct RootView: View {
     private func collectPendingImports() {
         ShareImportInbox.pendingImports().forEach(enqueue)
         presentNextImport()
+    }
+
+    private func openPendingWidgetRoute() {
+        guard scenePhase == .active, canPresentImports,
+              let route = pendingWidgetRoute else { return }
+        pendingWidgetRoute = nil
+        switch route {
+        case .budget:
+            selectedTab = .home
+        case .addExpense:
+            selectedTab = .home
+            expenseActionRequest = .addExpense
+        case .pasteExpense:
+            selectedTab = .home
+            expenseActionRequest = .pasteExpense
+        case .screenshotExpense:
+            selectedTab = .home
+            expenseActionRequest = .screenshotExpense
+        case .insights:
+            selectedTab = .insights
+        }
     }
 
     private func enqueue(_ pending: PendingShareImport) {

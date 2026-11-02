@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import PhotosUI
 import MoneyIQCore
 
@@ -8,11 +9,18 @@ import MoneyIQCore
 /// nothing is written to disk or uploaded.
 struct ScreenshotImportView: View {
     let categories: [ExpenseCategory]
+    let autoPresentPicker: Bool
+
+    init(categories: [ExpenseCategory], autoPresentPicker: Bool = false) {
+        self.categories = categories
+        self.autoPresentPicker = autoPresentPicker
+    }
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     @State private var pickerItem: PhotosPickerItem?
+    @State private var isPickerPresented = false
     @State private var stage: Stage = .picking
     @State private var parsed: ParsedReceipt?
     @State private var errorMessage: String?
@@ -69,12 +77,15 @@ struct ScreenshotImportView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
 
-            PhotosPicker(selection: $pickerItem, matching: .screenshots) {
+            Button {
+                isPickerPresented = true
+            } label: {
                 Label("Choose Screenshot", systemImage: "photo.on.rectangle")
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
             }
             .buttonStyle(.glassProminent)
+            .photosPicker(isPresented: $isPickerPresented, selection: $pickerItem, matching: .screenshots)
             .padding(.horizontal, 32)
 
             Spacer()
@@ -82,6 +93,16 @@ struct ScreenshotImportView: View {
         .onChange(of: pickerItem) { _, newItem in
             guard let newItem else { return }
             Task { await handlePicked(newItem) }
+        }
+        .task {
+            guard autoPresentPicker else { return }
+            do {
+                try await Task.sleep(for: .milliseconds(350))
+                guard pickerItem == nil, !isPickerPresented else { return }
+                isPickerPresented = true
+            } catch {
+                // The sheet was dismissed before the picker opened.
+            }
         }
     }
 
