@@ -13,6 +13,8 @@ struct LocalIntelligenceCard: View {
     @State private var answer: String?
     @State private var isThinking = false
     @State private var errorMessage: String?
+    @State private var generationTask: Task<Void, Never>?
+    @State private var activeRequestID: UUID?
 
     private var availability: LocalFinanceIntelligence.Availability {
         LocalFinanceIntelligence.availability
@@ -87,8 +89,16 @@ struct LocalIntelligenceCard: View {
         .padding(18)
         .glassEffect(.regular, in: .rect(cornerRadius: AppTheme.cardCornerRadius))
         .onChange(of: facts) { _, _ in
+            generationTask?.cancel()
+            activeRequestID = nil
+            isThinking = false
             answer = nil
             errorMessage = nil
+        }
+        .onDisappear {
+            generationTask?.cancel()
+            activeRequestID = nil
+            isThinking = false
         }
     }
 
@@ -108,14 +118,20 @@ struct LocalIntelligenceCard: View {
         answer = nil
         errorMessage = nil
         isThinking = true
-        Task {
+        let requestID = UUID()
+        let currentFacts = facts
+        activeRequestID = requestID
+        generationTask = Task {
             do {
-                let result = try await LocalFinanceIntelligence.answer(facts: facts, question: trimmed)
+                let result = try await LocalFinanceIntelligence.answer(facts: currentFacts, question: trimmed)
+                guard activeRequestID == requestID else { return }
                 answer = result
             } catch {
+                guard activeRequestID == requestID else { return }
                 errorMessage = "I couldn't generate an answer right now. Please try again."
             }
             isThinking = false
+            activeRequestID = nil
         }
     }
 }

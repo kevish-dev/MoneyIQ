@@ -86,10 +86,10 @@ struct SpendTrendCard: View {
                 Text("No spending yet.")
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.7))
-                    .frame(height: 170)
+                    .frame(height: 150)
             } else {
                 chart
-                    .frame(height: 190)
+                    .frame(height: 160)
             }
         }
         .padding(AppTheme.Spacing.large)
@@ -110,7 +110,7 @@ struct SpendTrendCard: View {
                 .font(.caption.weight(.semibold))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(AppTheme.pillBackgroundOnHero, in: Capsule())
+                .glassEffect(.regular.tint(.white.opacity(0.12)), in: .capsule)
                 .foregroundStyle(.white)
             }
             Spacer()
@@ -125,7 +125,7 @@ struct SpendTrendCard: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
                     .padding(10)
-                    .background(AppTheme.pillBackgroundOnHero, in: Circle())
+                    .glassEffect(.regular.tint(.white.opacity(0.12)), in: .circle)
             }
         }
     }

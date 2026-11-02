@@ -118,13 +118,13 @@ struct InsightsView: View {
                         emptyState
                     } else {
                         editorialHeader
-                        spendTrendCard
                         LocalIntelligenceCard(
                             title: "Ask your spending",
                             subtitle: "A private explanation of the numbers on this page",
                             facts: insightFacts,
                             suggestions: ["What changed this month?", "Where can I look more closely?", "Summarize my spending"]
                         )
+                        spendTrendCard
                         if isCurrentMonth {
                             cashFlowCard
                         } else {
