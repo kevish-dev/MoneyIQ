@@ -49,7 +49,7 @@ struct InsightsEngineTests {
     }
 
     @Test func categoryBreakdownSumsPerCategoryForCurrentMonth() {
-        let now = Date()
+        let now = Calendar.current.date(from: DateComponents(year: 2024, month: 6, day: 15))!
         let food = ExpenseCategory(name: "Food")
         let travel = ExpenseCategory(name: "Travel")
         let transactions = [
@@ -136,7 +136,7 @@ struct InsightsEngineTests {
     }
 
     @Test func categorySharesSumToOneAndSortDescending() {
-        let now = Date()
+        let now = Calendar.current.date(from: DateComponents(year: 2024, month: 6, day: 15))!
         let food = ExpenseCategory(name: "Food", systemIconName: "fork.knife")
         let travel = ExpenseCategory(name: "Travel", systemIconName: "airplane")
         let transactions = [
