@@ -60,6 +60,7 @@ struct ProjectsView: View {
                 .frame(maxWidth: 700)
                 .frame(maxWidth: .infinity)
             }
+            .background(AppTheme.pageGradient.ignoresSafeArea())
             .safeAreaInset(edge: .bottom) {
                 Button { showingAddProject = true } label: {
                     Label("New project", systemImage: "plus")
@@ -132,7 +133,7 @@ struct ProjectsView: View {
             Text("NEXT PAYMENT")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .tracking(1.5)
-                .foregroundStyle(AppTheme.accent)
+                .foregroundStyle(AppTheme.accentText)
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(installment.label).font(.headline)
@@ -145,7 +146,7 @@ struct ProjectsView: View {
             if let due = installment.dueDate {
                 Label(due < .now ? "Overdue since \(due.formatted(date: .abbreviated, time: .omitted))" : "Due \(due.formatted(date: .abbreviated, time: .omitted))", systemImage: "calendar")
                     .font(.caption)
-                    .foregroundStyle(due < .now ? .red : .secondary)
+                    .foregroundStyle(due < .now ? AppTheme.negativeText : AppTheme.muted)
             }
         }
         .padding(18)
@@ -230,7 +231,7 @@ private struct ProjectRow: View {
                 Spacer()
                 if outstandingReimbursements > 0 {
                     Text("\(outstandingReimbursements.formatted(.currency(code: currencyCode))) to recover")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(AppTheme.accentText)
                 }
             }
             .font(.caption)
@@ -257,16 +258,16 @@ private struct AddProjectView: View {
             Form {
                 FinanceFormIntro(icon: "briefcase", title: "Start with the quote", detail: "Give the project a name and total. Add milestone payments as the work progresses.")
                     .listRowBackground(Color.clear)
-                TextField("Project name (e.g. Website Redesign)", text: $name)
-                TextField("Client name (optional)", text: $clientName)
+                TextField("Project name (e.g. Website Redesign)", text: $name, prompt: Text("Project name (e.g. Website Redesign)").foregroundStyle(AppTheme.muted))
+                TextField("Client name (optional)", text: $clientName, prompt: Text("Client name (optional)").foregroundStyle(AppTheme.muted))
                 HStack {
                     Text("Total quoted")
                     Spacer()
-                    TextField("0.00", text: $totalText)
+                    TextField("0.00", text: $totalText, prompt: Text("0.00").foregroundStyle(AppTheme.muted))
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
                 }
-                TextField("Notes (optional)", text: $notes)
+                TextField("Notes (optional)", text: $notes, prompt: Text("Notes (optional)").foregroundStyle(AppTheme.muted))
             }
             .navigationTitle("New Project")
             .compactFormLayout()

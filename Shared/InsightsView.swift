@@ -154,6 +154,7 @@ struct InsightsView: View {
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
+            .background(AppTheme.pageGradient.ignoresSafeArea())
             .navigationTitle("Insights")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -171,7 +172,7 @@ struct InsightsView: View {
             Text("YOUR MONEY, IN FOCUS")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .tracking(2)
-                .foregroundStyle(AppTheme.accent)
+                .foregroundStyle(AppTheme.accentText)
             Text("See the story behind the spend.")
                 .font(.system(size: 28, weight: .bold, design: .rounded))
                 .fixedSize(horizontal: false, vertical: true)
@@ -191,7 +192,7 @@ struct InsightsView: View {
             } label: {
             Image(systemName: "chevron.left")
                     .font(.title2)
-                    .foregroundStyle(AppTheme.accent)
+                    .foregroundStyle(AppTheme.accentText)
             }
 
             Spacer()
@@ -209,7 +210,7 @@ struct InsightsView: View {
             } label: {
             Image(systemName: "chevron.right")
                     .font(.title2)
-                    .foregroundStyle(canGoToNextMonth ? AppTheme.accent : Color.secondary.opacity(0.3))
+                    .foregroundStyle(canGoToNextMonth ? AppTheme.accentText : Color.secondary.opacity(0.3))
             }
             .disabled(!canGoToNextMonth)
         }
@@ -251,7 +252,7 @@ struct InsightsView: View {
                             .foregroundStyle(.secondary)
                         Text(forecast.projectedEndOfMonthBalance, format: .currency(code: currencyCode))
                             .font(.title2.bold())
-                            .foregroundStyle(forecast.projectedEndOfMonthBalance < 0 ? .red : .primary)
+                            .foregroundStyle(forecast.projectedEndOfMonthBalance < 0 ? AppTheme.negativeText : AppTheme.ink)
                     }
                     Spacer()
                 }
@@ -291,7 +292,7 @@ struct InsightsView: View {
                             systemImage: percent >= 0 ? "arrow.up.right" : "arrow.down.right"
                         )
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(percent >= 0 ? .red : .green)
+                        .foregroundStyle(percent >= 0 ? AppTheme.negativeText : AppTheme.positiveText)
                     }
                 }
             }
@@ -357,7 +358,7 @@ struct InsightsView: View {
                                         Spacer()
                                         Image(systemName: share.systemIconName)
                                             .font(.caption)
-                                            .foregroundStyle(AppTheme.accent)
+                                            .foregroundStyle(AppTheme.accentText)
                                     }
                                     Text(share.total, format: .currency(code: currencyCode))
                                         .font(.subheadline.weight(.semibold))
@@ -401,7 +402,7 @@ struct InsightsView: View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Unusual Spending", systemImage: "exclamationmark.triangle.fill")
                 .font(.headline)
-                .foregroundStyle(.red)
+                .foregroundStyle(AppTheme.negativeText)
             ForEach(anomalies.prefix(5), id: \.transaction.id) { anomaly in
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {

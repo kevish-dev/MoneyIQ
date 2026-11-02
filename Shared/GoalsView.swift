@@ -46,6 +46,7 @@ struct GoalsView: View {
                 .frame(maxWidth: 700)
                 .frame(maxWidth: .infinity)
             }
+            .background(AppTheme.pageGradient.ignoresSafeArea())
             .safeAreaInset(edge: .bottom) {
                 Button {
                     showingAddGoal = true
@@ -113,7 +114,7 @@ struct GoalsView: View {
             Text("NEXT MILESTONE")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .tracking(1.5)
-                .foregroundStyle(AppTheme.accent)
+                .foregroundStyle(AppTheme.accentText)
             HStack {
                 Text(goal.name).font(.title3.bold())
                 Spacer()
@@ -261,7 +262,7 @@ private struct GoalDetailView: View {
                                 .font(.subheadline).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Image(systemName: "calendar.badge.clock").foregroundStyle(AppTheme.accent)
+                        Image(systemName: "calendar.badge.clock").foregroundStyle(AppTheme.accentText)
                     }
                     .padding(16)
                     .glassEffect(.regular, in: .rect(cornerRadius: 18))
@@ -291,7 +292,7 @@ private struct GoalDetailView: View {
                 ForEach(goal.contributions.sorted { $0.date > $1.date }) { contribution in
                     HStack(spacing: 12) {
                         Image(systemName: "arrow.down.left")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(AppTheme.positiveText)
                             .frame(width: 34, height: 34)
                             .glassEffect(.regular, in: .circle)
                         VStack(alignment: .leading, spacing: 2) {
@@ -326,6 +327,7 @@ private struct GoalDetailView: View {
             .frame(maxWidth: 700)
             .frame(maxWidth: .infinity)
         }
+        .background(AppTheme.pageGradient.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             Button { showingContribute = true } label: {
                 Label("Add funds", systemImage: "plus")
@@ -402,12 +404,12 @@ private struct AddContributionView: View {
                 HStack {
                     Text("Amount")
                     Spacer()
-                    TextField("0.00", text: $amountText)
+                    TextField("0.00", text: $amountText, prompt: Text("0.00").foregroundStyle(AppTheme.muted))
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
                 }
                 DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
-                TextField("Note (optional)", text: $note)
+                TextField("Note (optional)", text: $note, prompt: Text("Note (optional)").foregroundStyle(AppTheme.muted))
             }
             .navigationTitle("Add Funds")
             .compactFormLayout()
@@ -464,12 +466,12 @@ private struct EditContributionView: View {
                 HStack {
                     Text("Amount")
                     Spacer()
-                    TextField("0.00", text: $amountText)
+                    TextField("0.00", text: $amountText, prompt: Text("0.00").foregroundStyle(AppTheme.muted))
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
                 }
                 DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
-                TextField("Note (optional)", text: $note)
+                TextField("Note (optional)", text: $note, prompt: Text("Note (optional)").foregroundStyle(AppTheme.muted))
             }
             .navigationTitle("Edit Contribution")
             .compactFormLayout()
@@ -533,11 +535,11 @@ private struct EditGoalView: View {
             Form {
                 FinanceFormIntro(icon: "target", title: "Shape your goal", detail: "Set a clear amount and date. MoneyIQ will show a monthly pace based on what you've saved.")
                     .listRowBackground(Color.clear)
-                TextField("Goal name (e.g. Trip to Goa)", text: $name)
+                TextField("Goal name (e.g. Trip to Goa)", text: $name, prompt: Text("Goal name (e.g. Trip to Goa)").foregroundStyle(AppTheme.muted))
                 HStack {
                     Text("Target amount")
                     Spacer()
-                    TextField("0.00", text: $targetText)
+                    TextField("0.00", text: $targetText, prompt: Text("0.00").foregroundStyle(AppTheme.muted))
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
                 }
@@ -616,11 +618,11 @@ private struct AddGoalView: View {
             Form {
                 FinanceFormIntro(icon: "target", title: "Choose what matters", detail: "A name, target amount, and date are enough to get started.")
                     .listRowBackground(Color.clear)
-                TextField("Goal name (e.g. Trip to Goa)", text: $name)
+                TextField("Goal name (e.g. Trip to Goa)", text: $name, prompt: Text("Goal name (e.g. Trip to Goa)").foregroundStyle(AppTheme.muted))
                 HStack {
                     Text("Target amount")
                     Spacer()
-                    TextField("0.00", text: $targetText)
+                    TextField("0.00", text: $targetText, prompt: Text("0.00").foregroundStyle(AppTheme.muted))
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
                 }

@@ -174,6 +174,7 @@ struct ProjectDetailView: View {
             .frame(maxWidth: 700)
             .frame(maxWidth: .infinity)
         }
+        .background(AppTheme.pageGradient.ignoresSafeArea())
         .navigationTitle(project.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -234,7 +235,7 @@ struct ProjectDetailView: View {
     private func sectionHeading(_ title: String, count: Int, add: @escaping () -> Void) -> some View {
         HStack {
             Text(title).tracking(1.4)
-            Text("\(count)").foregroundStyle(AppTheme.accent)
+            Text("\(count)").foregroundStyle(AppTheme.accentText)
             Spacer()
             Button(action: add) { Image(systemName: "plus") }
                 .buttonStyle(.glass)
@@ -359,12 +360,12 @@ private struct InstallmentRow: View {
                 }
                 Text(installment.isReceived ? "Tap to correct receipt" : "Tap to mark received")
                     .font(.caption2)
-                    .foregroundStyle(AppTheme.accent)
+                    .foregroundStyle(AppTheme.accentText)
             }
             Spacer()
             Text(installment.amount, format: .currency(code: currencyCode))
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(installment.isReceived ? .green : .primary)
+                .foregroundStyle(installment.isReceived ? AppTheme.positiveText : AppTheme.ink)
         }
         .padding(.vertical, AppTheme.Spacing.xs)
     }
@@ -389,7 +390,7 @@ private struct ReimbursementRow: View {
             Spacer()
             Text(reimbursement.amount, format: .currency(code: currencyCode))
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(reimbursement.isRecovered ? .green : .orange)
+                .foregroundStyle(reimbursement.isRecovered ? AppTheme.positiveText : AppTheme.accentText)
         }
         .padding(.vertical, AppTheme.Spacing.xs)
     }
@@ -425,7 +426,7 @@ private struct AddInstallmentView: View {
             Form {
                 FinanceFormIntro(icon: "banknote", title: "Schedule a payment", detail: "Use a percentage or a fixed amount. The due date helps you know when to follow up.")
                     .listRowBackground(Color.clear)
-                TextField("Label (e.g. Advance, Milestone 1)", text: $label)
+                TextField("Label (e.g. Advance, Milestone 1)", text: $label, prompt: Text("Label (e.g. Advance, Milestone 1)").foregroundStyle(AppTheme.muted))
 
                 Section {
                     Picker("Entry", selection: $entryMode) {
@@ -457,7 +458,7 @@ private struct AddInstallmentView: View {
                     if hasDueDate {
                         DatePicker("Due", selection: $dueDate, displayedComponents: [.date, .hourAndMinute])
                     }
-                    TextField("Note (optional)", text: $note)
+                    TextField("Note (optional)", text: $note, prompt: Text("Note (optional)").foregroundStyle(AppTheme.muted))
                 }
             }
             .navigationTitle("Add Installment")
@@ -526,11 +527,11 @@ private struct EditInstallmentView: View {
             Form {
                 FinanceFormIntro(icon: "pencil", title: "Update this payment", detail: "Correct its amount, due time, or the exact date and time received.")
                     .listRowBackground(Color.clear)
-                TextField("Label", text: $label)
+                TextField("Label", text: $label, prompt: Text("Label").foregroundStyle(AppTheme.muted))
                 HStack {
                     Text("Amount")
                     Spacer()
-                    TextField("0.00", text: $amountText)
+                    TextField("0.00", text: $amountText, prompt: Text("0.00").foregroundStyle(AppTheme.muted))
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
                 }
@@ -542,7 +543,7 @@ private struct EditInstallmentView: View {
                 if isReceived {
                     DatePicker("Received at", selection: $receivedDate, displayedComponents: [.date, .hourAndMinute])
                 }
-                TextField("Note (optional)", text: $note)
+                TextField("Note (optional)", text: $note, prompt: Text("Note (optional)").foregroundStyle(AppTheme.muted))
             }
             .navigationTitle("Edit Installment")
             .compactFormLayout()
@@ -668,16 +669,16 @@ private struct AddReimbursementView: View {
             Form {
                 FinanceFormIntro(icon: "arrow.uturn.backward", title: "Track a client cost", detail: "Keep money you fronted separate from the payment for your work.")
                     .listRowBackground(Color.clear)
-                TextField("What did you pay for? (e.g. Domain, VPS)", text: $title)
+                TextField("What did you pay for? (e.g. Domain, VPS)", text: $title, prompt: Text("What did you pay for? (e.g. Domain, VPS)").foregroundStyle(AppTheme.muted))
                 HStack {
                     Text("Amount")
                     Spacer()
-                    TextField("0.00", text: $amountText)
+                    TextField("0.00", text: $amountText, prompt: Text("0.00").foregroundStyle(AppTheme.muted))
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
                 }
                 DatePicker("Paid at", selection: $date, displayedComponents: [.date, .hourAndMinute])
-                TextField("Note (optional)", text: $note)
+                TextField("Note (optional)", text: $note, prompt: Text("Note (optional)").foregroundStyle(AppTheme.muted))
             }
             .navigationTitle("Add Reimbursement")
             .compactFormLayout()
@@ -740,11 +741,11 @@ private struct EditReimbursementView: View {
             Form {
                 FinanceFormIntro(icon: "pencil", title: "Update this cost", detail: "Correct the amount or when the client paid you back.")
                     .listRowBackground(Color.clear)
-                TextField("Title", text: $title)
+                TextField("Title", text: $title, prompt: Text("Title").foregroundStyle(AppTheme.muted))
                 HStack {
                     Text("Amount")
                     Spacer()
-                    TextField("0.00", text: $amountText)
+                    TextField("0.00", text: $amountText, prompt: Text("0.00").foregroundStyle(AppTheme.muted))
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
                 }
@@ -753,7 +754,7 @@ private struct EditReimbursementView: View {
                 if isRecovered {
                     DatePicker("Recovered at", selection: $recoveredDate, displayedComponents: [.date, .hourAndMinute])
                 }
-                TextField("Note (optional)", text: $note)
+                TextField("Note (optional)", text: $note, prompt: Text("Note (optional)").foregroundStyle(AppTheme.muted))
             }
             .navigationTitle("Edit Reimbursement")
             .compactFormLayout()
@@ -815,16 +816,16 @@ private struct EditProjectView: View {
             Form {
                 FinanceFormIntro(icon: "briefcase", title: "Refine the quote", detail: "Update the project details without changing its payment history.")
                     .listRowBackground(Color.clear)
-                TextField("Project name", text: $name)
-                TextField("Client name (optional)", text: $clientName)
+                TextField("Project name", text: $name, prompt: Text("Project name").foregroundStyle(AppTheme.muted))
+                TextField("Client name (optional)", text: $clientName, prompt: Text("Client name (optional)").foregroundStyle(AppTheme.muted))
                 HStack {
                     Text("Total quoted")
                     Spacer()
-                    TextField("0.00", text: $totalText)
+                    TextField("0.00", text: $totalText, prompt: Text("0.00").foregroundStyle(AppTheme.muted))
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
                 }
-                TextField("Notes (optional)", text: $notes)
+                TextField("Notes (optional)", text: $notes, prompt: Text("Notes (optional)").foregroundStyle(AppTheme.muted))
 
                 Section {
                     Button("Delete Project", role: .destructive) { showingDeleteConfirmation = true }
