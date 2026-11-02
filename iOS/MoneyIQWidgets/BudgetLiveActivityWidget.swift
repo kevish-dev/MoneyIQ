@@ -12,6 +12,9 @@ struct BudgetLiveActivityWidget: Widget {
         } dynamicIsland: { context in
             if context.state.showOnDynamicIsland {
                 DynamicIsland {
+                    DynamicIslandExpandedRegion(.center) {
+                        DynamicIslandHeader(state: context.state)
+                    }
                     DynamicIslandExpandedRegion(.leading) {
                         DynamicIslandExpandedLeading(state: context.state)
                     }
@@ -23,23 +26,31 @@ struct BudgetLiveActivityWidget: Widget {
                     }
                 } compactLeading: {
                     Image(systemName: context.state.dynamicIslandKind.systemIconName)
+                        .foregroundStyle(context.state.remaining < 0 && context.state.dynamicIslandKind == .budgetProgress ? .red : .white)
                 } compactTrailing: {
                     DynamicIslandCompactTrailing(state: context.state)
                 } minimal: {
                     Image(systemName: context.state.dynamicIslandKind.systemIconName)
                 }
             } else {
-                // Dynamic Island turned off in Settings — the Activity still
-                // runs (Lock Screen may want it), but the Island itself
-                // shows nothing beyond the system's own minimal chrome.
+                // A Lock Screen-only Activity still gets Island space from
+                // the system. Keep money private and show a quiet brand mark.
                 DynamicIsland {
-                    DynamicIslandExpandedRegion(.center) { EmptyView() }
+                    DynamicIslandExpandedRegion(.center) {
+                        Label("MoneyIQ", systemImage: "chart.pie.fill")
+                            .font(.caption.weight(.semibold))
+                    }
+                    DynamicIslandExpandedRegion(.bottom) {
+                        Text("Budget tracking is on the Lock Screen")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 } compactLeading: {
-                    EmptyView()
+                    Image(systemName: "chart.pie.fill")
                 } compactTrailing: {
                     EmptyView()
                 } minimal: {
-                    EmptyView()
+                    Image(systemName: "chart.pie.fill")
                 }
             }
         }
@@ -48,22 +59,51 @@ struct BudgetLiveActivityWidget: Widget {
 
 // MARK: - Dynamic Island, per content kind
 
+private struct DynamicIslandHeader: View {
+    let state: BudgetActivityAttributes.ContentState
+
+    var body: some View {
+        Label(title, systemImage: state.dynamicIslandKind.systemIconName)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.top, 4)
+    }
+
+    private var title: String {
+        switch state.dynamicIslandKind {
+        case .budgetProgress: "MONTHLY BUDGET"
+        case .savingsGoalProgress: state.goalName ?? "SAVINGS GOAL"
+        case .dailyPace: "DAILY SPEND PACE"
+        }
+    }
+}
+
 private struct DynamicIslandExpandedLeading: View {
     let state: BudgetActivityAttributes.ContentState
 
     var body: some View {
         switch state.dynamicIslandKind {
         case .budgetProgress:
-            Label(state.spent.formatted(.currency(code: state.currencyCode)), systemImage: "creditcard")
-                .font(.caption)
+            metric(label: "SPENT", amount: state.spent)
         case .savingsGoalProgress:
-            Label(state.goalName ?? "No goal", systemImage: "target")
-                .font(.caption)
-                .lineLimit(1)
+            metric(label: "SAVED", amount: state.goalSaved)
         case .dailyPace:
-            Label("\(state.daysRemainingInMonth)d left", systemImage: "calendar")
-                .font(.caption)
+            metric(label: "PER DAY", amount: state.recommendedDailySpend)
         }
+    }
+
+    private func metric(label: String, amount: Decimal) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label).font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
+            Text(amount, format: .currency(code: state.currencyCode).precision(.fractionLength(0)))
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+                .privacySensitive()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -73,19 +113,36 @@ private struct DynamicIslandExpandedTrailing: View {
     var body: some View {
         switch state.dynamicIslandKind {
         case .budgetProgress:
-            Text(state.remaining.formatted(.currency(code: state.currencyCode)) + " left")
-                .font(.caption)
+            metric(label: state.remaining < 0 ? "OVER BY" : "LEFT", amount: abs(state.remaining))
+                .foregroundStyle(state.remaining < 0 ? .red : .primary)
         case .savingsGoalProgress:
             if state.goalName != nil {
-                Text(state.goalSaved.formatted(.currency(code: state.currencyCode)))
-                    .font(.caption)
+                metric(label: "TO GO", amount: max(0, state.goalTarget - state.goalSaved))
             } else {
-                Text("—").font(.caption)
+                Text("No active goal").font(.caption2).foregroundStyle(.secondary)
             }
         case .dailyPace:
-            Text(state.recommendedDailySpend.formatted(.currency(code: state.currencyCode)) + "/day")
-                .font(.caption)
+            VStack(alignment: .trailing, spacing: 3) {
+                Text("DAYS LEFT").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
+                Text("\(state.daysRemainingInMonth)")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
+    }
+
+    private func metric(label: String, amount: Decimal) -> some View {
+        VStack(alignment: .trailing, spacing: 3) {
+            Text(label).font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
+            Text(amount, format: .currency(code: state.currencyCode).precision(.fractionLength(0)))
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+                .privacySensitive()
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }
 
@@ -95,21 +152,34 @@ private struct DynamicIslandExpandedBottom: View {
     var body: some View {
         switch state.dynamicIslandKind {
         case .budgetProgress:
-            ProgressView(value: state.fractionUsed)
-                .tint(state.fractionUsed >= 1 ? .red : .accentColor)
+            VStack(alignment: .leading, spacing: 7) {
+                ProgressView(value: state.fractionUsed)
+                    .tint(state.remaining < 0 ? .red : .green)
+                Text(state.remaining < 0 ? "Monthly budget exceeded" : "\(Int((state.fractionUsed * 100).rounded()))% of monthly budget used")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 6)
         case .savingsGoalProgress:
             if state.goalName != nil {
-                ProgressView(value: state.goalProgressFraction)
-                    .tint(.accentColor)
+                VStack(alignment: .leading, spacing: 7) {
+                    ProgressView(value: state.goalProgressFraction)
+                        .tint(.green)
+                    Text("\(Int((state.goalProgressFraction * 100).rounded()))% of goal saved")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 6)
             } else {
-                Text("Set a savings goal to track it here.")
+                Text("Set a savings goal in MoneyIQ to track it here.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
         case .dailyPace:
-            Text("Spend up to this much per day to stay on budget.")
+            Text("Suggested daily limit for the rest of this month")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .padding(.top, 6)
         }
     }
 }
@@ -120,18 +190,18 @@ private struct DynamicIslandCompactTrailing: View {
     var body: some View {
         switch state.dynamicIslandKind {
         case .budgetProgress:
-            Text(state.remaining.formatted(.currency(code: state.currencyCode).precision(.fractionLength(0))))
-                .font(.caption2)
+            Text(state.remaining < 0 ? "OVER" : "\(Int((state.fractionUsed * 100).rounded()))%")
+                .font(.caption2.weight(.bold))
         case .savingsGoalProgress:
             if state.goalName != nil {
                 Text("\(Int((state.goalProgressFraction * 100).rounded()))%")
-                    .font(.caption2)
+                    .font(.caption2.weight(.bold))
             } else {
                 Text("—").font(.caption2)
             }
         case .dailyPace:
-            Text(state.recommendedDailySpend.formatted(.currency(code: state.currencyCode).precision(.fractionLength(0))))
-                .font(.caption2)
+            Text("\(state.daysRemainingInMonth)d")
+                .font(.caption2.weight(.bold))
         }
     }
 }

@@ -36,7 +36,7 @@ struct LiveActivitySettingsView: View {
             } header: {
                 Text("Dynamic Island")
             } footer: {
-                Text("Independent from the Lock Screen — pick different content for each, or the same one.")
+                Text("Choose separate content for the Island. If only the Lock Screen activity is on, the Island shows an icon without financial amounts.")
             }
 
             if settings.isBudgetLockScreenEnabled || settings.isBudgetDynamicIslandEnabled {
