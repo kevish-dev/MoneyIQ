@@ -9,7 +9,7 @@ struct FinanceFormIntro: View {
         HStack(alignment: .top, spacing: 13) {
             Image(systemName: icon)
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(AppTheme.accent)
+                .foregroundStyle(AppTheme.accentText)
                 .frame(width: 42, height: 42)
                 .glassEffect(.regular.tint(AppTheme.accent.opacity(0.12)), in: .circle)
             VStack(alignment: .leading, spacing: 5) {

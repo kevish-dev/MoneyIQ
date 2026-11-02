@@ -8,6 +8,44 @@ import SwiftUI
 /// automatically) plus the darker gradient stops used for hero cards that
 /// need an explicit `Color`/`LinearGradient` value.
 enum AppTheme {
+    /// Colors resolved from the active appearance. The dark palette keeps
+    /// glass legible against a warm near-black canvas instead of turning the
+    /// light palette's paper and ink into bright blocks.
+    static let ink = Color(uiColor: .label)
+    static let muted = Color(uiColor: .secondaryLabel)
+    static let surface = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.13, green: 0.12, blue: 0.13, alpha: 0.94)
+            : UIColor(white: 1, alpha: 0.88)
+    })
+    static let separator = Color(uiColor: .separator)
+    static let accentText = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 1, green: 0.66, blue: 0.43, alpha: 1)
+            : UIColor(red: 0.61, green: 0.16, blue: 0.07, alpha: 1)
+    })
+    static let positiveText = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.47, green: 0.86, blue: 0.68, alpha: 1)
+            : UIColor(red: 0.08, green: 0.43, blue: 0.26, alpha: 1)
+    })
+    static let negativeText = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 1, green: 0.56, blue: 0.52, alpha: 1)
+            : UIColor(red: 0.67, green: 0.16, blue: 0.13, alpha: 1)
+    })
+    static let pageGradient = LinearGradient(
+        colors: [
+            Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
+                ? UIColor(red: 0.075, green: 0.067, blue: 0.078, alpha: 1)
+                : UIColor(red: 1, green: 0.973, blue: 0.946, alpha: 1) }),
+            Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
+                ? UIColor(red: 0.11, green: 0.085, blue: 0.09, alpha: 1)
+                : UIColor(red: 0.985, green: 0.978, blue: 0.967, alpha: 1) })
+        ],
+        startPoint: .top,
+        endPoint: .bottom
+    )
     /// The trailing (right-side) toolbar slot, used for the top-right
     /// profile icon.
     static var trailingToolbarPlacement: ToolbarItemPlacement {
@@ -27,14 +65,24 @@ enum AppTheme {
     static let emberRed = Color(red: 0.70, green: 0.14, blue: 0.05)
 
     /// The dark red-to-orange gradient behind hero cards.
+    private static let heroDarkStart = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
+        ? UIColor(red: 0.19, green: 0.06, blue: 0.10, alpha: 1)
+        : UIColor(red: 0.40, green: 0.05, blue: 0.05, alpha: 1) })
+    private static let heroDarkMiddle = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
+        ? UIColor(red: 0.42, green: 0.12, blue: 0.10, alpha: 1)
+        : UIColor(red: 0.70, green: 0.14, blue: 0.05, alpha: 1) })
+    private static let heroDarkEnd = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
+        ? UIColor(red: 0.62, green: 0.24, blue: 0.12, alpha: 1)
+        : UIColor(red: 1, green: 0.478, blue: 0.161, alpha: 1) })
+
     static let heroGradient = LinearGradient(
-        colors: [deepRed, emberRed, accent],
+        colors: [heroDarkStart, heroDarkMiddle, heroDarkEnd],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
     static let heroGradientVertical = LinearGradient(
-        colors: [deepRed, emberRed, accent],
+        colors: [heroDarkStart, heroDarkMiddle, heroDarkEnd],
         startPoint: .top,
         endPoint: .bottom
     )

@@ -25,7 +25,7 @@ struct LocalIntelligenceCard: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "sparkles")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(AppTheme.accent)
+                    .foregroundStyle(AppTheme.accentText)
                     .frame(width: 38, height: 38)
                     .glassEffect(.regular.tint(AppTheme.accent.opacity(0.13)), in: .circle)
                 VStack(alignment: .leading, spacing: 3) {
@@ -36,7 +36,7 @@ struct LocalIntelligenceCard: View {
                 Text("ON DEVICE")
                     .font(.system(size: 9, weight: .bold, design: .rounded))
                     .tracking(1)
-                    .foregroundStyle(AppTheme.accent)
+                    .foregroundStyle(AppTheme.accentText)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
                     .glassEffect(.regular, in: .capsule)
@@ -66,7 +66,8 @@ struct LocalIntelligenceCard: View {
                 }
 
                 HStack(spacing: 8) {
-                    TextField("Ask about this data", text: $question)
+                    TextField("Ask about this data", text: $question, prompt: Text("Ask about this data").foregroundStyle(AppTheme.muted))
+                        .tint(AppTheme.accentText)
                         .submitLabel(.send)
                         .onSubmit { ask(question) }
                     Button { ask(question) } label: {

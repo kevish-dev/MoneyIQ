@@ -10,14 +10,7 @@ struct GlassBackdrop: View {
             let size = proxy.size
 
             ZStack {
-                LinearGradient(
-                    colors: [
-                        Color(red: 1.0, green: 0.95, blue: 0.90),
-                        Color(red: 1.0, green: 0.97, blue: 0.95)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                AppTheme.pageGradient
 
                 // Deliberately not sharing one GlassEffectContainer here:
                 // these two blobs are far apart and don't need to visually

@@ -1,12 +1,18 @@
 import SwiftUI
 
 enum SplitDesign {
-    static let ink = Color(red: 0.19, green: 0.16, blue: 0.16)
-    static let muted = Color(red: 0.48, green: 0.43, blue: 0.42)
-    static let paper = Color(red: 0.985, green: 0.978, blue: 0.967)
-    static let card = Color.white.opacity(0.88)
-    static let receive = Color(red: 0.10, green: 0.46, blue: 0.36)
-    static let pay = Color(red: 0.72, green: 0.25, blue: 0.17)
+    static let ink = AppTheme.ink
+    static let muted = AppTheme.muted
+    static let paper = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
+        ? UIColor(red: 0.075, green: 0.067, blue: 0.078, alpha: 1)
+        : UIColor(red: 0.985, green: 0.978, blue: 0.967, alpha: 1) })
+    static let card = AppTheme.surface
+    static let receive = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
+        ? UIColor(red: 0.43, green: 0.84, blue: 0.68, alpha: 1)
+        : UIColor(red: 0.10, green: 0.46, blue: 0.36, alpha: 1) })
+    static let pay = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
+        ? UIColor(red: 1, green: 0.55, blue: 0.42, alpha: 1)
+        : UIColor(red: 0.72, green: 0.25, blue: 0.17, alpha: 1) })
 
     static func money(_ amount: Decimal, code: String) -> String {
         amount.formatted(.currency(code: code).precision(.fractionLength(0...2)))
@@ -53,14 +59,14 @@ struct SplitSheetHeader: View {
         VStack(alignment: .leading, spacing: 9) {
             Image(systemName: symbol)
                 .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(AppTheme.emberRed)
+                .foregroundStyle(AppTheme.accentText)
                 .frame(width: 48, height: 48)
                 .background(AppTheme.emberRed.opacity(0.1), in: RoundedRectangle(cornerRadius: 15))
                 .padding(.bottom, 7)
             Text(eyebrow.uppercased())
                 .font(.system(size: 10, weight: .bold, design: .rounded))
                 .tracking(1.3)
-                .foregroundStyle(AppTheme.emberRed)
+                .foregroundStyle(AppTheme.accentText)
             Text(title)
                 .font(.system(size: 29, weight: .bold, design: .rounded))
                 .tracking(-0.7)
